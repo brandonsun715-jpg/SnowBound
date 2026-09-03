@@ -2,7 +2,7 @@
 
 A stylised-realistic ski / snowboard resort game made in Unity.
 
-- **Unity version:** 6000.0.x (Unity 6)
+- **Unity version:** Unity 6 (developed on 6000.5.11f1)
 - **Render pipeline:** URP (Universal Render Pipeline)
 
 ## Milestone 1 — playable vertical slice
