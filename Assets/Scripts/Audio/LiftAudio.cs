@@ -13,20 +13,20 @@ namespace SnowBound.Audio
     {
         public Chairlift lift;
 
-        [Range(0f, 1f)] public float volume = 0.5f;
+        [Range(0f, 1f)] public float volume = 0.22f;
         [Tooltip("Metres before the hum starts to fall away.")]
         public float nearDistance = 10f;
         [Tooltip("Metres beyond which it cannot be heard.")]
         public float farDistance = 95f;
-        [Tooltip("Cycles per loop. Lower is a heavier, slower machine.")]
-        public int motorCycles = 47;
+        [Tooltip("Fundamental of the motor, in hertz. Lower is a heavier machine.")]
+        public float motorHz = 88f;
 
         void Start()
         {
             if (lift == null) lift = Chairlift.Instance;
             if (lift == null) return;
 
-            AudioClip hum = ProceduralAudio.Hum("LiftMotor", 2f, motorCycles, 9001);
+            AudioClip hum = ProceduralAudio.Hum("LiftMotor", 2f, motorHz, 9001);
 
             // The two ends run the same machinery at slightly different
             // speeds, which stops them phasing into one tone.
