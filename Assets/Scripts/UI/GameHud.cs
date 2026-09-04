@@ -17,7 +17,7 @@ namespace SnowBound.Hud
     /// </summary>
     public class GameHud : MonoBehaviour
     {
-        const string ContainerName = "GeneratedHud";
+        const string ContainerName = "GeneratedSkiHud";
 
         public PlayerController player;
         public Chairlift lift;
@@ -36,79 +36,22 @@ namespace SnowBound.Hud
 
         void Build()
         {
-            var canvasObject = new GameObject(ContainerName);
-            canvasObject.transform.SetParent(transform, false);
+            Canvas canvas = HudFactory.Canvas(transform, ContainerName, 0);
+            Transform root = canvas.transform;
 
-            var canvas = canvasObject.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-
-            var scaler = canvasObject.AddComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920f, 1080f);
-            scaler.matchWidthOrHeight = 0.5f;
-
-            Font font = LoadFont();
-            if (font == null)
+            if (HudFactory.Font == null)
                 Debug.LogWarning("[GameHud] No built-in font found; the HUD will be blank.", this);
 
-            _status = Label(canvasObject.transform, "Status", font,
-                            new Vector2(0f, 1f), new Vector2(0f, 1f),
-                            new Vector2(36f, -30f), TextAnchor.UpperLeft, 34);
+            var wide = new Vector2(1000f, 220f);
 
-            _clock = Label(canvasObject.transform, "Clock", font,
-                           new Vector2(1f, 1f), new Vector2(1f, 1f),
-                           new Vector2(-36f, -30f), TextAnchor.UpperRight, 34);
+            _status = HudFactory.Label(root, "Status", new Vector2(0f, 1f), new Vector2(0f, 1f),
+                                       new Vector2(36f, -30f), wide, TextAnchor.UpperLeft, 34);
 
-            _prompt = Label(canvasObject.transform, "Prompt", font,
-                            new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-                            new Vector2(0f, 74f), TextAnchor.LowerCenter, 30);
+            _clock = HudFactory.Label(root, "Clock", new Vector2(1f, 1f), new Vector2(1f, 1f),
+                                      new Vector2(-36f, -30f), wide, TextAnchor.UpperRight, 34);
 
-            canvasObject.hideFlags = HideFlags.DontSaveInEditor;
-        }
-
-        static Font LoadFont()
-        {
-            Font font = null;
-            try { font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); }
-            catch { font = null; }
-
-            if (font == null)
-            {
-                try { font = Resources.GetBuiltinResource<Font>("Arial.ttf"); }
-                catch { font = null; }
-            }
-
-            return font;
-        }
-
-        static Text Label(Transform parent, string name, Font font, Vector2 anchor,
-                          Vector2 pivot, Vector2 offset, TextAnchor align, int size)
-        {
-            var go = new GameObject(name);
-            go.transform.SetParent(parent, false);
-
-            var rect = go.AddComponent<RectTransform>();
-            rect.anchorMin = anchor;
-            rect.anchorMax = anchor;
-            rect.pivot = pivot;
-            rect.anchoredPosition = offset;
-            rect.sizeDelta = new Vector2(1000f, 220f);
-
-            var text = go.AddComponent<Text>();
-            text.font = font;
-            text.fontSize = size;
-            text.alignment = align;
-            text.color = Color.white;
-            text.raycastTarget = false;
-            text.horizontalOverflow = HorizontalWrapMode.Overflow;
-            text.verticalOverflow = VerticalWrapMode.Overflow;
-
-            // Snow is white, so the text needs something behind it.
-            var shadow = go.AddComponent<Shadow>();
-            shadow.effectColor = new Color(0f, 0f, 0f, 0.8f);
-            shadow.effectDistance = new Vector2(2f, -2f);
-
-            return text;
+            _prompt = HudFactory.Label(root, "Prompt", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
+                                       new Vector2(0f, 74f), wide, TextAnchor.LowerCenter, 30);
         }
 
         void Update()

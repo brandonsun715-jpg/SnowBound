@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.Rendering;
 using SnowBound.Player;
+using SnowBound.Resort;
 
 namespace SnowBound.Weather
 {
@@ -176,22 +177,31 @@ namespace SnowBound.Weather
 
         void Apply()
         {
+            // Time of day decides where the sun is and how much light there
+            // is; the weather only decides how much of it gets through.
+            ResortClock clock = ResortClock.Instance;
+            float daylight = clock != null ? clock.Daylight : 1f;
+
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
             RenderSettings.fogDensity = Mathf.Lerp(clearFogDensity, stormFogDensity, storminess);
-            RenderSettings.fogColor = Color.Lerp(clearFog, stormFog, storminess);
+            RenderSettings.fogColor = Color.Lerp(clearFog, stormFog, storminess)
+                                    * Mathf.Lerp(0.72f, 1f, daylight);
 
             RenderSettings.ambientMode = AmbientMode.Trilight;
+            float ambient = Mathf.Lerp(0.55f, 1f, daylight);
             RenderSettings.ambientSkyColor = Color.Lerp(new Color(0.60f, 0.70f, 0.85f),
-                                                        new Color(0.66f, 0.68f, 0.72f), storminess);
+                                                        new Color(0.66f, 0.68f, 0.72f), storminess) * ambient;
             RenderSettings.ambientEquatorColor = Color.Lerp(new Color(0.55f, 0.60f, 0.68f),
-                                                            new Color(0.62f, 0.64f, 0.68f), storminess);
+                                                            new Color(0.62f, 0.64f, 0.68f), storminess) * ambient;
             RenderSettings.ambientGroundColor = Color.Lerp(new Color(0.70f, 0.72f, 0.75f),
-                                                           new Color(0.66f, 0.67f, 0.70f), storminess);
+                                                           new Color(0.66f, 0.67f, 0.70f), storminess) * ambient;
 
             if (sun != null)
             {
-                sun.intensity = Mathf.Lerp(clearSunIntensity, stormSunIntensity, storminess);
+                if (clock != null) sun.transform.rotation = clock.SunRotation;
+
+                sun.intensity = Mathf.Lerp(clearSunIntensity, stormSunIntensity, storminess) * daylight;
                 sun.color = Color.Lerp(clearSunColour, stormSunColour, storminess);
                 sun.shadowStrength = Mathf.Lerp(1f, 0.35f, storminess);
             }

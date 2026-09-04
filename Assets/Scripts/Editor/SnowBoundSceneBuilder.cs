@@ -12,6 +12,7 @@ using SnowBound.Game;
 using SnowBound.Hud;
 using SnowBound.Weather;
 using SnowBound.Audio;
+using SnowBound.Resort;
 
 namespace SnowBound.EditorTools
 {
@@ -45,6 +46,7 @@ namespace SnowBound.EditorTools
             AttachCamera();
             CreateWeather();
             CreateGameRules();
+            CreateResort();
 
             Directory.CreateDirectory(SceneFolder);
             AssetDatabase.Refresh();
@@ -228,6 +230,63 @@ namespace SnowBound.EditorTools
             go.AddComponent<GearRack>().Build();
             go.AddComponent<RunTimer>().Build();
             go.AddComponent<GameHud>();
+            go.AddComponent<ResortHud>();
+        }
+
+        /// <summary>
+        /// The tycoon layer: a clock, a ledger, a demand model, and a
+        /// facility component on each thing the resort already owns.
+        /// </summary>
+        static void CreateResort()
+        {
+            if (Object.FindAnyObjectByType<ResortClock>() != null) return;
+
+            var go = new GameObject("Resort");
+            go.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+            go.AddComponent<ResortClock>();
+            go.AddComponent<Ledger>();
+            go.AddComponent<ResortTraffic>();
+
+            var lift = Object.FindAnyObjectByType<Chairlift>();
+            if (lift != null && lift.GetComponent<LiftFacility>() == null)
+            {
+                var facility = lift.gameObject.AddComponent<LiftFacility>();
+                facility.displayName = "Chairlift";
+                facility.lift = lift;
+                facility.baseDailyUpkeep = 7000f;
+                facility.upkeepPerLevel = 2600f;
+                facility.baseQuality = 0.42f;
+                facility.qualityPerLevel = 0.20f;
+                facility.baseUpgradeCost = 14000f;
+                facility.upgradeCostPerLevel = 11000f;
+            }
+
+            var lodge = Object.FindAnyObjectByType<LodgeBuilder>();
+            if (lodge != null && lodge.GetComponent<LodgeFacility>() == null)
+            {
+                var facility = lodge.gameObject.AddComponent<LodgeFacility>();
+                facility.displayName = "Lodge";
+                facility.baseDailyUpkeep = 4200f;
+                facility.upkeepPerLevel = 2100f;
+                facility.baseQuality = 0.50f;
+                facility.qualityPerLevel = 0.18f;
+                facility.baseUpgradeCost = 9000f;
+                facility.upgradeCostPerLevel = 8000f;
+            }
+
+            var park = Object.FindAnyObjectByType<TerrainPark>();
+            if (park != null && park.GetComponent<ParkFacility>() == null)
+            {
+                var facility = park.gameObject.AddComponent<ParkFacility>();
+                facility.displayName = "Terrain Park";
+                facility.park = park;
+                facility.baseDailyUpkeep = 2400f;
+                facility.upkeepPerLevel = 1500f;
+                facility.baseQuality = 0.35f;
+                facility.qualityPerLevel = 0.22f;
+                facility.baseUpgradeCost = 6000f;
+                facility.upgradeCostPerLevel = 5000f;
+            }
         }
 
         static void AttachCamera()

@@ -46,6 +46,10 @@ namespace SnowBound.Player
         /// <summary>V steps the weather on. Works while riding the lift too.</summary>
         public bool WeatherPressed => ReadWeather();
 
+        /// <summary>Dismisses whatever is waiting on the player. Never gated,
+        /// because it is what un-gates everything else.</summary>
+        public bool ContinuePressed => ReadContinue();
+
 #if ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
 
         static Vector2 ReadMove()
@@ -104,6 +108,13 @@ namespace SnowBound.Player
             return k != null && k.vKey.wasPressedThisFrame;
         }
 
+        static bool ReadContinue()
+        {
+            var k = Keyboard.current;
+            if (k == null) return false;
+            return k.spaceKey.wasPressedThisFrame || k.enterKey.wasPressedThisFrame;
+        }
+
 #else
 
         static Vector2 ReadMove()
@@ -130,6 +141,11 @@ namespace SnowBound.Player
         }
 
         static bool ReadWeather() { return Input.GetKeyDown(KeyCode.V); }
+
+        static bool ReadContinue()
+        {
+            return Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return);
+        }
 
 #endif
     }

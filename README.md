@@ -27,6 +27,7 @@ Assets/
     Buildings/            resort buildings (lodge today, more with the tycoon)
     Lifts/                chairlift path, chairs and operation
     Game/                 loop rules: gear rack, run timing
+    Resort/               the tycoon layer: clock, money, facilities, demand
     Weather/              sky, snowfall, snow conditions
     Audio/                what the ride and the lift sound like
     UI/                   heads-up display
@@ -67,12 +68,13 @@ Milestone 1 is complete.
 
 Milestone 2 is complete.
 
-## Milestone 3 — depth
+## Milestone 3 — resort management
 
-1. Rail grinding, tricks and scoring.
-2. Guests skiing the mountain.
-3. Saving and loading.
-4. The tycoon layer: building runs and lifts rather than generating them.
+1. **Economy** — cash, a resort day, revenue, upkeep, end-of-day figures. *(done)*
+2. Guests: NPCs who arrive, buy tickets, ride, ski and leave.
+3. Resort rating out of five.
+4. Building system: place a lodge, rental, restaurant, shop, ticket booth.
+5. Upgrade system for the lift, lodge, trails and park.
 
 ## Building the scene
 
@@ -127,6 +129,13 @@ Boarding is automatic: stand in the loading area and the next free chair
 picks you up, and the lift sets you down at the top. A prototype should not
 fail because of a mistimed button press.
 
+## The resort day
+
+A day runs 08:00 to 17:00 in about seven real minutes. Guests arrive across
+it on a curve, upkeep is charged by the second, and at closing the books are
+read back and the next morning begins. There is no night: a night is time
+the player cannot do anything with.
+
 ## Notes
 
 - `LodgeBuilder.EntrancePosition` is where the player spawns and swaps gear.
@@ -144,6 +153,13 @@ fail because of a mistimed button press.
   underfoot, what the sky is doing — never the keyboard. So hardpack rings
   and deep powder swallows the high frequencies, without either being
   special-cased.
+- Every pound in or out goes through `Ledger.Earn` or `Ledger.Spend` against
+  a named line. That is what makes an end-of-day summary possible at all: the
+  summary is not computed separately, it is the day's own record read back,
+  so what the player sees and what the books say cannot disagree.
+- A `Facility` answers three questions and no others: what it costs to run,
+  how good it is, and what its level does. Money, rating and the upgrade menu
+  read those answers rather than knowing what a chairlift is.
 - The mountain holds a list of `PisteDefinition`s rather than one run. They
   fan out from the base area, spread apart through the middle and converge
   again at the summit, so one lift serves all of them. The terrain carves
