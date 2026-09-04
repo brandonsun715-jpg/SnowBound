@@ -19,6 +19,9 @@ namespace SnowBound.Lifts
     /// deliberate: a prototype should not fail because you mistimed a
     /// button press.
     /// </summary>
+    // Chairs must move before the rider reads the seat, or the body trails a
+    // frame behind the chair and visibly judders.
+    [DefaultExecutionOrder(-100)]
     [ExecuteAlways]
     public class Chairlift : MonoBehaviour
     {
@@ -56,8 +59,8 @@ namespace SnowBound.Lifts
         public float unloadLead = 9f;
 
         [Header("Seat")]
-        [Tooltip("Where the rider sits relative to the seat. Negative Y so the legs dangle.")]
-        public Vector3 seatOffset = new Vector3(0f, -0.72f, -0.05f);
+        [Tooltip("Where the rider sits relative to the seat. Negative Y puts the\nhips on the cushion and lets the legs dangle.")]
+        public Vector3 seatOffset = new Vector3(0f, -0.55f, 0.02f);
 
         // ---------------------------------------------------------------
 
@@ -134,7 +137,9 @@ namespace SnowBound.Lifts
             Material steel = MaterialFactory.Create("LiftSteel", new Color(0.55f, 0.57f, 0.60f), 0.45f, 0.6f);
             Material cable = MaterialFactory.Create("LiftCable", new Color(0.18f, 0.19f, 0.21f), 0.35f);
             Material shell = MaterialFactory.Create("LiftShell", new Color(0.22f, 0.25f, 0.30f), 0.25f);
-            Material chairMat = MaterialFactory.Create("LiftChair", new Color(0.78f, 0.20f, 0.14f), 0.25f);
+            // Slate, not red: the rider's jacket is red and the two were
+            // blending into one another on the chair.
+            Material chairMat = MaterialFactory.Create("LiftChair", new Color(0.22f, 0.28f, 0.38f), 0.25f);
 
             BuildTowers(root.transform, line, steel);
             BuildTerminals(root.transform, line, steel, shell);

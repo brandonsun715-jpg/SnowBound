@@ -50,7 +50,16 @@ Assets/
 7. **Loop glue** — gear rack at the lodge, start and finish gates, run timer,
    HUD. *(done)*
 
-Milestone 1 is complete. Next passes are polish and depth, not new scaffolding.
+Milestone 1 is complete.
+
+## Milestone 2 — look, feel and performance
+
+1. **Mountain pass** — bare rock on steep faces, rollers to jump, snow on the
+   trees and boulders, and the whole forest welded into a few draw calls.
+   *(done)*
+2. Weather and changing snow.
+3. Audio.
+4. More of the mountain: a second run, a terrain park.
 
 ## Building the scene
 
@@ -112,6 +121,13 @@ fail because of a mistimed button press.
   body, gravity and the ground probe; a `LocomotionMode` component decides
   only how velocity and facing change. Skiing and snowboarding drop into the
   same slot, so they can feel nothing like walking.
+- Trees, rocks and piste markers are welded into a handful of batched meshes
+  by `Core/MeshBatcher`. Five hundred trees as five hundred objects is five
+  hundred draw calls; as nine meshes it is nine. Colliders stay separate,
+  because physics wants them individually.
+- The terrain is drawn as two sub-meshes. Faces too steep for snow to settle
+  on are sorted into a rock sub-mesh at build time, which gives real cliffs
+  with no custom shader. The piste is always snow, whatever its slope.
 - `SnowSurface` marks a collider as carveable snow. Spray and tracks check it,
   which is why neither happens on the lodge deck, a lift tower or a rock.
 - The chairlift lays its own line out by asking the mountain where the piste

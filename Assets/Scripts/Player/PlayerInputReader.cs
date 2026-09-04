@@ -16,8 +16,10 @@ namespace SnowBound.Player
     /// </summary>
     public class PlayerInputReader : MonoBehaviour
     {
-        [Tooltip("Set false to freeze input, e.g. while riding the chairlift.")]
+        [Tooltip("Movement and actions. Switched off while riding the chairlift.")]
         public bool enableInput = true;
+        [Tooltip("Looking around. Stays on while riding, because the view is\nhalf the point of a chairlift.")]
+        public bool enableLook = true;
 
         /// <summary>x = left/right, y = forward/back. Length never exceeds 1.</summary>
         public Vector2 Move
@@ -31,9 +33,9 @@ namespace SnowBound.Player
         }
 
         /// <summary>Mouse movement, already normalised so both backends feel the same.</summary>
-        public Vector2 Look => enableInput ? ReadLook() : Vector2.zero;
+        public Vector2 Look => enableLook ? ReadLook() : Vector2.zero;
 
-        public float Zoom => enableInput ? ReadZoom() : 0f;
+        public float Zoom => enableLook ? ReadZoom() : 0f;
         public bool JumpPressed => enableInput && ReadJump();
         public bool SprintHeld => enableInput && ReadSprint();
         public bool BrakeHeld => enableInput && ReadBrake();

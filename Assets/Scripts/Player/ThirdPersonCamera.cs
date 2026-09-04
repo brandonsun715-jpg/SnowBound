@@ -6,6 +6,9 @@ namespace SnowBound.Player
     /// Orbiting follow camera. Mouse turns it, scroll wheel pushes it in and
     /// out, and it pulls in close when terrain gets between it and the player.
     /// </summary>
+    // Runs after everything else so it always frames where the player
+    // actually ended up this frame, including on a moving chairlift.
+    [DefaultExecutionOrder(100)]
     public class ThirdPersonCamera : MonoBehaviour
     {
         public Transform target;
@@ -35,6 +38,11 @@ namespace SnowBound.Player
         public float restingFieldOfView = 60f;
         [Tooltip("Widening the lens is most of why fast feels fast.")]
         public float fastFieldOfView = 74f;
+
+        [Header("Chairlift")]
+        [Tooltip("The camera sits further back while riding so you can see the chair and the view.")]
+        public float ridingDistance = 9f;
+        public float ridingFocusHeight = 1.1f;
 
         [Header("Collision")]
         public float collisionRadius = 0.32f;
@@ -75,7 +83,8 @@ namespace SnowBound.Player
                 distance = Mathf.Clamp(distance - input.Zoom * zoomSpeed, minDistance, maxDistance);
             }
 
-            float rush = player != null ? Mathf.Clamp01(player.Speed / fastSpeed) : 0f;
+            bool riding = player != null && player.IsRiding;
+            float rush = !riding && player != null ? Mathf.Clamp01(player.Speed / fastSpeed) : 0f;
 
             if (_camera != null)
             {
@@ -85,10 +94,11 @@ namespace SnowBound.Player
             }
 
             Quaternion rotation = Quaternion.Euler(_pitch, _yaw, 0f);
-            Vector3 focus = target.position + Vector3.up * focusHeight;
+            Vector3 focus = target.position + Vector3.up * (riding ? ridingFocusHeight : focusHeight);
             Vector3 back = rotation * Vector3.back;
 
-            float wanted = ClearDistance(focus, back, distance + rush * speedPullback);
+            float reach = riding ? ridingDistance : distance + rush * speedPullback;
+            float wanted = ClearDistance(focus, back, reach);
             // Snap in fast so the camera never clips, ease out slowly.
             float ease = wanted < _currentDistance ? 1f : 1f - Mathf.Exp(-8f * Time.deltaTime);
             _currentDistance = Mathf.Lerp(_currentDistance, wanted, ease);

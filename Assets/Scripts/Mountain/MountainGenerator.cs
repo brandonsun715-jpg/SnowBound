@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 using SnowBound.Core;
@@ -51,6 +52,15 @@ namespace SnowBound.Mountain
         public float rimEnd = 155f;
         public float rimHeight = 70f;
 
+        [Header("Rollers")]
+        [Tooltip("Smooth bumps across the run. These are the jumps.")]
+        public bool rollers = true;
+        [Tooltip("Distances up the mountain, in metres, where a roller sits.")]
+        public float[] rollerZ = { 128f, 214f, 300f };
+        public float rollerHeight = 2.6f;
+        [Tooltip("How long each roller is, front to back.")]
+        public float rollerLength = 26f;
+
         [Header("Terrain noise")]
         public float noiseScale = 0.012f;
         [Tooltip("Bumpiness on the groomed run. Keep this small.")]
@@ -62,6 +72,10 @@ namespace SnowBound.Mountain
         [Header("Look")]
         [Tooltip("Leave empty to auto-create a plain snow material at runtime.")]
         public Material snowMaterial;
+        [Tooltip("Used on faces too steep to hold snow. Leave empty for a default.")]
+        public Material rockMaterial;
+        [Tooltip("Faces steeper than this show bare rock. The piste never does.")]
+        [Range(20f, 75f)] public float rockAngle = 40f;
 
         // ---------------------------------------------------------------
 
@@ -79,6 +93,7 @@ namespace SnowBound.Mountain
 
         Mesh _mesh;
         Material _runtimeSnow;
+        Material _runtimeRock;
         bool _noiseReady;
         float _nOffX, _nOffZ;
 
@@ -147,6 +162,35 @@ namespace SnowBound.Mountain
         }
 
         /// <summary>Ground height in world space at (x, z).</summary>
+        /// <summary>
+        /// Smooth bumps down the middle of the run. They fade out towards the
+        /// edges so the piste keeps its shape, and they are what turns the
+        /// jump button into something worth pressing.
+        /// </summary>
+        float Rollers(float x, float z)
+        {
+            if (!rollers || rollerZ == null || rollerZ.Length == 0) return 0f;
+            if (rollerLength < 1f || rollerHeight <= 0f) return 0f;
+
+            float half = PisteHalfWidth(z);
+            float across = 1f - Smooth01(half * 0.2f, half * 1.1f, Mathf.Abs(x - PisteCenterX(z)));
+            if (across <= 0f) return 0f;
+
+            float sum = 0f;
+            float reach = rollerLength * 0.5f;
+
+            for (int i = 0; i < rollerZ.Length; i++)
+            {
+                float t = (z - rollerZ[i]) / reach;
+                if (t <= -1f || t >= 1f) continue;
+                // Cosine bump: zero height and zero slope at both ends, so a
+                // roller blends into the run instead of stepping out of it.
+                sum += 0.5f * (1f + Mathf.Cos(t * Mathf.PI)) * rollerHeight;
+            }
+
+            return sum * across;
+        }
+
         public float SampleHeight(float x, float z)
         {
             EnsureNoise();
@@ -167,6 +211,8 @@ namespace SnowBound.Mountain
 
             // Bumpy off-piste, near-smooth on-piste.
             h += Fbm(x, z) * Mathf.Lerp(pisteNoise, offPisteNoise, wall);
+
+            h += Rollers(x, z);
 
             // Berms so the player cannot slide off the front/back edge of the map.
             h += Smooth01(14f, 0f, z) * 22f;
@@ -224,7 +270,8 @@ namespace SnowBound.Mountain
 
             var verts = new Vector3[nx * nz];
             var uvs = new Vector2[nx * nz];
-            var tris = new int[(nx - 1) * (nz - 1) * 6];
+            var snow = new List<int>((nx - 1) * (nz - 1) * 6);
+            var rock = new List<int>();
 
             float x0 = -width * 0.5f;
 
@@ -240,18 +287,13 @@ namespace SnowBound.Mountain
                 }
             }
 
-            int t = 0;
             for (int iz = 0; iz < nz - 1; iz++)
             {
                 for (int ix = 0; ix < nx - 1; ix++)
                 {
                     int i = iz * nx + ix;
-                    tris[t++] = i;
-                    tris[t++] = i + nx;
-                    tris[t++] = i + nx + 1;
-                    tris[t++] = i;
-                    tris[t++] = i + nx + 1;
-                    tris[t++] = i + 1;
+                    Sort(verts, i, i + nx, i + nx + 1, snow, rock);
+                    Sort(verts, i, i + nx + 1, i + 1, snow, rock);
                 }
             }
 
@@ -265,7 +307,9 @@ namespace SnowBound.Mountain
             _mesh.indexFormat = IndexFormat.UInt32;
             _mesh.vertices = verts;
             _mesh.uv = uvs;
-            _mesh.triangles = tris;
+            _mesh.subMeshCount = 2;
+            _mesh.SetTriangles(snow, 0);
+            _mesh.SetTriangles(rock, 1);
             _mesh.RecalculateNormals();
             _mesh.RecalculateBounds();
 
@@ -275,14 +319,45 @@ namespace SnowBound.Mountain
             mc.sharedMesh = null;
             mc.sharedMesh = _mesh;
 
-            Material mat = snowMaterial;
-            if (mat == null)
+            Material snowMat = snowMaterial;
+            if (snowMat == null)
             {
                 if (_runtimeSnow == null)
                     _runtimeSnow = MaterialFactory.Create("SnowRuntime", new Color(0.93f, 0.95f, 1f), 0.32f);
-                mat = _runtimeSnow;
+                snowMat = _runtimeSnow;
             }
-            GetComponent<MeshRenderer>().sharedMaterial = mat;
+
+            Material rockMat = rockMaterial;
+            if (rockMat == null)
+            {
+                if (_runtimeRock == null)
+                    _runtimeRock = MaterialFactory.Create("RockRuntime", new Color(0.30f, 0.29f, 0.29f), 0.06f);
+                rockMat = _runtimeRock;
+            }
+
+            GetComponent<MeshRenderer>().sharedMaterials = new[] { snowMat, rockMat };
+        }
+
+        /// <summary>
+        /// Snow settles on gentle ground and slides off steep ground, so a
+        /// face steeper than rockAngle is drawn as bare rock. The piste is
+        /// always snow, whatever the slope says.
+        /// </summary>
+        void Sort(Vector3[] verts, int a, int b, int c, List<int> snow, List<int> rock)
+        {
+            List<int> target = snow;
+
+            Vector3 normal = Vector3.Cross(verts[b] - verts[a], verts[c] - verts[a]);
+            if (normal.sqrMagnitude > 1e-10f &&
+                Vector3.Angle(normal.normalized, Vector3.up) > rockAngle)
+            {
+                Vector3 centre = (verts[a] + verts[b] + verts[c]) / 3f;
+                if (!IsOnPiste(centre.x, centre.z, 6f)) target = rock;
+            }
+
+            target.Add(a);
+            target.Add(b);
+            target.Add(c);
         }
     }
 }

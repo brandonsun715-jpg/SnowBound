@@ -267,7 +267,7 @@ namespace SnowBound.Player
             OnSnow = false;
 
             Body.enabled = false;
-            Input.enableInput = false;
+            Input.enableInput = false;   // but Input.enableLook stays on
             if (_visual != null) _visual.SetSeated(true);
         }
 
