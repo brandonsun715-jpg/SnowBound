@@ -41,7 +41,7 @@ Assets/
 2. **Lodge and base area** — building, deck, entrance point. *(done)*
 3. **Player** — walking, gravity, jumping, third-person camera. *(done)*
 4. **Skiing and snowboarding** — momentum, edges, carving, braking. *(done)*
-5. Snow spray and tracks.
+5. **Snow spray and tracks** — particle plume and ribbons in the snow. *(done)*
 6. Chairlift.
 7. Loop glue: gear swap at the lodge, start/finish areas.
 
@@ -98,6 +98,12 @@ props after changing generator settings.
   scrub off sideways drift, and turning costs speed. Skis grip hard and turn
   tightly; the board grips about half as much and turns slower, so it washes
   out into wide drifting arcs. All the difference lives in `SnowRideSettings`.
+- Snow spray and tracks read the rider's speed and sideways slip rather than
+  its inputs, so they respond to what is actually happening on the snow. A
+  straight glide gives a thin trail; a hockey stop throws a wall of it.
+- `SnowTrackWriter` stitches ribbons of triangles just above the terrain in
+  fixed-size chunks and drops the oldest, so a long run costs bounded memory.
+  When real snow deformation replaces it, only that file changes.
 - `PlayerInputReader` is the only file that touches the keyboard and mouse,
   and compiles against either Unity input backend.
 - `MountainGenerator` is the single source of truth for ground height.

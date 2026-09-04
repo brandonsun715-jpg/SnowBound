@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace SnowBound.Core
 {
@@ -52,6 +53,38 @@ namespace SnowBound.Core
                 m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
             }
 
+            return m;
+        }
+
+        /// <summary>A soft additive-free transparent material for particles.</summary>
+        public static Material CreateParticle(string name, Color tint, Texture2D texture)
+        {
+            Shader sh = Shader.Find("Universal Render Pipeline/Particles/Unlit");
+            if (sh == null) sh = Shader.Find("Particles/Standard Unlit");
+            if (sh == null) sh = Shader.Find("Sprites/Default");
+
+            var m = new Material(sh);
+            m.name = name;
+
+            if (m.HasProperty("_BaseMap")) m.SetTexture("_BaseMap", texture);
+            if (m.HasProperty("_MainTex")) m.SetTexture("_MainTex", texture);
+            if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", tint);
+            if (m.HasProperty("_Color")) m.SetColor("_Color", tint);
+
+            // Force straight alpha blending. Harmless on shaders that are
+            // already transparent, such as the Sprites/Default fallback.
+            if (m.HasProperty("_Surface")) m.SetFloat("_Surface", 1f);
+            if (m.HasProperty("_Blend")) m.SetFloat("_Blend", 0f);
+            if (m.HasProperty("_SrcBlend")) m.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
+            if (m.HasProperty("_DstBlend")) m.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
+            if (m.HasProperty("_ZWrite")) m.SetFloat("_ZWrite", 0f);
+
+            m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            m.EnableKeyword("_ALPHABLEND_ON");
+            m.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+            m.renderQueue = (int)RenderQueue.Transparent;
+
+            m.hideFlags = HideFlags.DontSave;
             return m;
         }
     }

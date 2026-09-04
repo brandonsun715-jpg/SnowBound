@@ -158,6 +158,8 @@ namespace SnowBound.EditorTools
             go.AddComponent<WalkMode>();
             go.AddComponent<SkiMode>();
             go.AddComponent<SnowboardMode>();
+            go.AddComponent<SnowSpray>();
+            go.AddComponent<SnowTrackWriter>();
             go.AddComponent<PlayerController>();
 
             var lodge = Object.FindAnyObjectByType<LodgeBuilder>();

@@ -43,7 +43,8 @@ namespace SnowBound.Player
 
         /// <summary>
         /// How hard the edges are sliding sideways, metres per second.
-        /// Snow spray and tracks read this in the next step.
+        /// Signed: positive means slipping to the rider's right. Snow spray
+        /// reads the sign to throw the plume out on the correct side.
         /// </summary>
         public float LateralSlip;
 
@@ -51,6 +52,10 @@ namespace SnowBound.Player
         public Vector3 GroundNormal { get; private set; } = Vector3.up;
         public float GroundSlopeDegrees { get; private set; }
         public LocomotionKind CurrentKind => _active != null ? _active.Kind : startMode;
+
+        /// <summary>True on skis or a board, as opposed to on foot.</summary>
+        public bool IsRidingSnow =>
+            CurrentKind == LocomotionKind.Ski || CurrentKind == LocomotionKind.Snowboard;
 
         public float Gravity => gravity;
         public float Speed => new Vector3(Velocity.x, 0f, Velocity.z).magnitude;

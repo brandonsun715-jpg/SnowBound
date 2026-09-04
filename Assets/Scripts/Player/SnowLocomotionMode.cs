@@ -118,7 +118,7 @@ namespace SnowBound.Player
             if (tuck && forward < S.pushSpeed)
                 forward = Mathf.MoveTowards(forward, S.pushSpeed, 6f * dt);
 
-            Player.LateralSlip = Mathf.Abs(sideways);
+            Player.LateralSlip = sideways;
 
             Vector3 ride = heading * forward + side * sideways;
 
