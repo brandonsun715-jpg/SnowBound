@@ -1,4 +1,5 @@
 using UnityEngine;
+using SnowBound.Weather;
 
 namespace SnowBound.Player
 {
@@ -27,6 +28,11 @@ namespace SnowBound.Player
         float _yaw;
         float _airLock;
         bool _wasGrounded;
+        WeatherSystem _weather;
+
+        /// <summary>Deep snow drags more and holds an edge better than hardpack.</summary>
+        float DragScale { get { return _weather != null ? _weather.DragMultiplier : 1f; } }
+        float GripScale { get { return _weather != null ? _weather.GripMultiplier : 1f; } }
 
         /// <summary>True when we are actually riding, not mid-jump.</summary>
         bool Riding => Player.IsGrounded && _airLock <= 0f;
@@ -48,6 +54,7 @@ namespace SnowBound.Player
         public override void Tick(float dt)
         {
             if (_airLock > 0f) _airLock -= dt;
+            if (_weather == null) _weather = WeatherSystem.Instance;
 
             Vector2 move = Player.Input.Move;
             float steer = move.x;
@@ -94,7 +101,7 @@ namespace SnowBound.Player
             // Edges bite first, so the pull of gravity across the slope always
             // survives one frame. That leaves a believable trickle of sideslip
             // instead of an unnaturally perfect edge hold.
-            float grip = S.lateralGrip * (brake ? S.brakeGrip : 1f);
+            float grip = S.lateralGrip * GripScale * (brake ? S.brakeGrip : 1f);
             sideways *= Mathf.Exp(-grip * dt);
 
             Vector3 slopePull = Vector3.ProjectOnPlane(new Vector3(0f, Player.Gravity, 0f), normal);
@@ -105,7 +112,7 @@ namespace SnowBound.Player
             if (speed > 0.01f)
             {
                 float drag = tuck ? S.tuckAirDrag : S.airDrag;
-                float loss = (S.snowFriction + drag * speed * speed) * dt;
+                float loss = (S.snowFriction * DragScale + drag * speed * speed) * dt;
                 loss += Mathf.Abs(steer) * speed * S.carveScrub * dt;
                 if (brake) loss += S.brakeStrength * dt;
 

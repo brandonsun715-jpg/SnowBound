@@ -10,6 +10,7 @@ using SnowBound.Player;
 using SnowBound.Lifts;
 using SnowBound.Game;
 using SnowBound.Hud;
+using SnowBound.Weather;
 
 namespace SnowBound.EditorTools
 {
@@ -41,6 +42,7 @@ namespace SnowBound.EditorTools
             CreateChairlift();
             CreatePlayer();
             AttachCamera();
+            CreateWeather();
             CreateGameRules();
 
             Directory.CreateDirectory(SceneFolder);
@@ -187,6 +189,26 @@ namespace SnowBound.EditorTools
 
             var lodge = Object.FindAnyObjectByType<LodgeBuilder>();
             if (lodge != null) go.transform.position = lodge.EntrancePosition + Vector3.up * 0.3f;
+        }
+
+        static void CreateWeather()
+        {
+            if (Object.FindAnyObjectByType<WeatherSystem>() != null) return;
+
+            var go = new GameObject("Weather");
+            go.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+
+            var system = go.AddComponent<WeatherSystem>();
+            foreach (Light light in Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
+            {
+                if (light.type == LightType.Directional) { system.sun = light; break; }
+            }
+
+            var snow = go.AddComponent<Snowfall>();
+            snow.weather = system;
+
+            var player = Object.FindAnyObjectByType<PlayerController>();
+            if (player != null) snow.follow = player.transform;
         }
 
         static void CreateGameRules()

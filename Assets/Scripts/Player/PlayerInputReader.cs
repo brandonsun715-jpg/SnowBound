@@ -43,6 +43,9 @@ namespace SnowBound.Player
         /// <summary>1 = walk, 2 = ski, 3 = snowboard. -1 when nothing pressed.</summary>
         public int GearPressed => enableInput ? ReadGear() : -1;
 
+        /// <summary>V steps the weather on. Works while riding the lift too.</summary>
+        public bool WeatherPressed => ReadWeather();
+
 #if ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
 
         static Vector2 ReadMove()
@@ -95,6 +98,12 @@ namespace SnowBound.Player
             return -1;
         }
 
+        static bool ReadWeather()
+        {
+            var k = Keyboard.current;
+            return k != null && k.vKey.wasPressedThisFrame;
+        }
+
 #else
 
         static Vector2 ReadMove()
@@ -119,6 +128,8 @@ namespace SnowBound.Player
             if (Input.GetKeyDown(KeyCode.Alpha3)) return 3;
             return -1;
         }
+
+        static bool ReadWeather() { return Input.GetKeyDown(KeyCode.V); }
 
 #endif
     }

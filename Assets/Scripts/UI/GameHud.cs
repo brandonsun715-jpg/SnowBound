@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using SnowBound.Player;
 using SnowBound.Lifts;
 using SnowBound.Game;
+using SnowBound.Weather;
 
 namespace SnowBound.Hud
 {
@@ -22,6 +23,7 @@ namespace SnowBound.Hud
         public Chairlift lift;
         public GearRack rack;
         public RunTimer timer;
+        public WeatherSystem weather;
 
         Text _status;
         Text _clock;
@@ -115,11 +117,17 @@ namespace SnowBound.Hud
             if (lift == null) lift = Chairlift.Instance;
             if (rack == null) rack = FindAnyObjectByType<GearRack>();
             if (timer == null) timer = FindAnyObjectByType<RunTimer>();
+            if (weather == null) weather = WeatherSystem.Instance;
 
             if (player == null || _status == null) return;
 
-            _status.text = GearName(player.CurrentKind) + "\n" +
-                           Mathf.RoundToInt(player.Speed * 3.6f) + " km/h";
+            string report = GearName(player.CurrentKind) + "\n" +
+                            Mathf.RoundToInt(player.Speed * 3.6f) + " km/h";
+
+            if (weather != null)
+                report += "\n" + weather.Description + "  \u00b7  " + weather.SnowDescription;
+
+            _status.text = report;
 
             _clock.text = ClockText();
             _prompt.text = PromptText();

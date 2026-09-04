@@ -27,6 +27,7 @@ Assets/
     Buildings/            resort buildings (lodge today, more with the tycoon)
     Lifts/                chairlift path, chairs and operation
     Game/                 loop rules: gear rack, run timing
+    Weather/              sky, snowfall, snow conditions
     UI/                   heads-up display
     Player/               character, locomotion modes, input, camera
     Mountain/             terrain generation and scene dressing
@@ -57,7 +58,8 @@ Milestone 1 is complete.
 1. **Mountain pass** — bare rock on steep faces, rollers to jump, snow on the
    trees and boulders, and the whole forest welded into a few draw calls.
    *(done)*
-2. Weather and changing snow.
+2. **Weather and changing snow** — one storminess dial driving light, fog,
+   falling snow and how the mountain rides. *(done)*
 3. Audio.
 4. More of the mountain: a second run, a terrain park.
 
@@ -98,6 +100,7 @@ props after changing generator settings.
 | Mouse | Turn the camera |
 | Scroll wheel | Zoom in / out |
 | `1` / `2` / `3` | Walk / ski / snowboard, **at the lodge gear rack only** |
+| `V` | Step the weather on (clear, snow, storm) |
 | `Esc` | Release the mouse cursor (in the editor) |
 
 ## The loop
@@ -121,6 +124,11 @@ fail because of a mistimed button press.
   body, gravity and the ground probe; a `LocomotionMode` component decides
   only how velocity and facing change. Skiing and snowboarding drop into the
   same slot, so they can feel nothing like walking.
+- Weather is one number. `WeatherSystem.storminess` drives the fog, the sun,
+  the ambient light and the snowfall together, so they can never disagree.
+  Snow on the ground is tracked separately as powder, which builds while it
+  snows and packs down afterwards: a run is slow and forgiving after a dump
+  and quick and skittish once it has been skied out.
 - Trees, rocks and piste markers are welded into a handful of batched meshes
   by `Core/MeshBatcher`. Five hundred trees as five hundred objects is five
   hundred draw calls; as nine meshes it is nine. Colliders stay separate,

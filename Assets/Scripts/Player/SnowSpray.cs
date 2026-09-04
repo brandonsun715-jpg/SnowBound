@@ -1,5 +1,6 @@
 using UnityEngine;
 using SnowBound.Core;
+using SnowBound.Weather;
 
 namespace SnowBound.Player
 {
@@ -29,6 +30,7 @@ namespace SnowBound.Player
 
         ParticleSystem _system;
         Transform _nozzle;
+        WeatherSystem _weather;
 
         void Start()
         {
@@ -113,8 +115,11 @@ namespace SnowBound.Player
             float speed = player.Speed;
             float slip = Mathf.Abs(player.LateralSlip);
 
+            if (_weather == null) _weather = WeatherSystem.Instance;
+            float depth = _weather != null ? _weather.SprayMultiplier : 1f;
+
             float glide = Mathf.Clamp01((speed - minSpeed) / Mathf.Max(0.1f, fastSpeed - minSpeed));
-            float rate = glide * glideRate + slip * slipRate;
+            float rate = (glide * glideRate + slip * slipRate) * depth;
             emission.rateOverTime = Mathf.Clamp(rate, 0f, maxRate);
 
             // Faster and slidier throws the snow further.
