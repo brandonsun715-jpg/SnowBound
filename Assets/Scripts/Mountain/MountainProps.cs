@@ -10,6 +10,7 @@ namespace SnowBound.Mountain
     /// Everything it makes lives under one child object called "GeneratedProps"
     /// and is never saved into the scene file.
     /// </summary>
+    [ExecuteAlways]
     public class MountainProps : MonoBehaviour
     {
         const string ContainerName = "GeneratedProps";

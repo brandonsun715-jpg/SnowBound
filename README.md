@@ -23,6 +23,7 @@ Assets/
   Scenes/                 the game scene(s)
   Scripts/
     Core/                 shared helpers (procedural meshes, materials)
+    Editor/               editor-only tools (scene builder menu)
     Player/               character, movement modes, camera
     Mountain/             terrain generation and scene dressing
     Lifts/                chairlift
@@ -43,11 +44,23 @@ Assets/
 6. Chairlift.
 7. Loop glue: gear swap at the lodge, start/finish areas.
 
+## Building the scene
+
+Top menu bar → **SnowBound → Build Mountain Scene**. This creates the scene,
+the camera, the sun, the fog and the mountain, then saves it to
+`Assets/Scenes/Mountain.unity`. Scene setup lives in
+`Assets/Scripts/Editor/SnowBoundSceneBuilder.cs` so it is version controlled
+rather than a list of clicks to remember.
+
+**SnowBound → Rebuild Mountain In Open Scene** regenerates the terrain and
+props after changing generator settings.
+
 ## Notes
 
 - `MountainGenerator` is the single source of truth for ground height.
   Other systems call `SampleHeight(x, z)`, `PisteCenterX(z)` and
   `PistePoint(z)` instead of guessing or raycasting.
 - Generated geometry uses `HideFlags.DontSave`, so the scene file stays
-  small. The mountain rebuilds automatically on Play; in the editor use the
-  component's **Build Now** context-menu item to preview it.
+  small. `MountainGenerator` and `MountainProps` are `[ExecuteAlways]`, so the
+  mountain rebuilds itself whenever the scene loads, scripts recompile, or you
+  press Play. No manual step needed.

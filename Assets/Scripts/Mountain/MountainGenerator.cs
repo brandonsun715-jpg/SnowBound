@@ -13,6 +13,7 @@ namespace SnowBound.Mountain
     /// z = length is the top (lift top station). x = 0 is the middle.
     /// Keep this GameObject at position (0,0,0), rotation 0, scale 1.
     /// </summary>
+    [ExecuteAlways]
     [RequireComponent(typeof(MeshFilter))]
     [RequireComponent(typeof(MeshRenderer))]
     [RequireComponent(typeof(MeshCollider))]
