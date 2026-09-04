@@ -25,7 +25,7 @@ Assets/
     Core/                 shared helpers (procedural meshes, materials)
     Editor/               editor-only tools (scene builder menu)
     Buildings/            resort buildings (lodge today, more with the tycoon)
-    Player/               character, movement modes, camera
+    Player/               character, locomotion modes, input, camera
     Mountain/             terrain generation and scene dressing
     Lifts/                chairlift
   Prefabs/
@@ -39,7 +39,7 @@ Assets/
 
 1. **Mountain** — terrain mesh, pine trees, rocks, piste markers. *(done)*
 2. **Lodge and base area** — building, deck, entrance point. *(done)*
-3. Player: walking, gravity, jumping, third-person camera.
+3. **Player** — walking, gravity, jumping, third-person camera. *(done)*
 4. Skiing and snowboarding movement modes.
 5. Snow spray and tracks.
 6. Chairlift.
@@ -56,10 +56,28 @@ rather than a list of clicks to remember.
 **SnowBound → Rebuild Mountain In Open Scene** regenerates the terrain and
 props after changing generator settings.
 
+## Controls
+
+| Input | Action |
+|---|---|
+| `W A S D` | Move, relative to the camera |
+| Mouse | Turn the camera |
+| Scroll wheel | Zoom in / out |
+| `Space` | Jump |
+| `Shift` | Run |
+| `1` / `2` / `3` | Walk / ski / snowboard |
+| `Esc` | Release the mouse cursor (in the editor) |
+
 ## Notes
 
 - `LodgeBuilder.EntrancePosition` is where the player spawns and swaps gear.
   Other systems read it rather than hard-coding a position.
+- Locomotion is a slot, not an if-statement. `PlayerController` owns the
+  body, gravity and the ground probe; a `LocomotionMode` component decides
+  only how velocity and facing change. Skiing and snowboarding drop into the
+  same slot, so they can feel nothing like walking.
+- `PlayerInputReader` is the only file that touches the keyboard and mouse,
+  and compiles against either Unity input backend.
 - `MountainGenerator` is the single source of truth for ground height.
   Other systems call `SampleHeight(x, z)`, `PisteCenterX(z)` and
   `PistePoint(z)` instead of guessing or raycasting.

@@ -6,6 +6,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using SnowBound.Mountain;
 using SnowBound.Buildings;
+using SnowBound.Player;
 
 namespace SnowBound.EditorTools
 {
@@ -34,6 +35,8 @@ namespace SnowBound.EditorTools
             ConfigureEnvironment();
             CreateMountain();
             CreateLodge();
+            CreatePlayer();
+            AttachCamera();
 
             Directory.CreateDirectory(SceneFolder);
             AssetDatabase.Refresh();
@@ -134,6 +137,41 @@ namespace SnowBound.EditorTools
 
             gen.Build();
             props.Build();
+        }
+
+        static void CreatePlayer()
+        {
+            if (Object.FindAnyObjectByType<PlayerController>() != null) return;
+
+            var go = new GameObject("Player");
+
+            var body = go.AddComponent<CharacterController>();
+            body.height = 1.8f;
+            body.radius = 0.35f;
+            body.center = new Vector3(0f, 0.9f, 0f);
+            body.slopeLimit = 45f;
+            body.stepOffset = 0.45f;
+            body.skinWidth = 0.05f;
+
+            go.AddComponent<PlayerInputReader>();
+            go.AddComponent<PlayerVisual>();
+            go.AddComponent<WalkMode>();
+            go.AddComponent<PlayerController>();
+
+            var lodge = Object.FindAnyObjectByType<LodgeBuilder>();
+            if (lodge != null) go.transform.position = lodge.EntrancePosition + Vector3.up * 0.3f;
+        }
+
+        static void AttachCamera()
+        {
+            var cam = Object.FindAnyObjectByType<Camera>();
+            var player = Object.FindAnyObjectByType<PlayerController>();
+            if (cam == null || player == null) return;
+
+            var rig = cam.GetComponent<ThirdPersonCamera>();
+            if (rig == null) rig = cam.gameObject.AddComponent<ThirdPersonCamera>();
+            rig.target = player.transform;
+            rig.input = player.GetComponent<PlayerInputReader>();
         }
 
         static void CreateLodge()
