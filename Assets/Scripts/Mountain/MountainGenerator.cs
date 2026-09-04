@@ -22,7 +22,7 @@ namespace SnowBound.Mountain
     public class MountainGenerator : MonoBehaviour
     {
         [Header("Size (metres)")]
-        public float width = 320f;
+        public float width = 470f;
         public float length = 420f;
         [Tooltip("Smaller = smoother terrain but a heavier mesh. 2 is a good default.")]
         public float cellSize = 2f;
@@ -37,19 +37,42 @@ namespace SnowBound.Mountain
         public float topPadZ = 395f;
         public float padFade = 30f;
 
-        [Header("Piste (the ski run)")]
-        public float pisteHalfWidth = 22f;
-        [Tooltip("Extra width added at the very bottom so the base area is open.")]
-        public float basePisteExtraWidth = 25f;
-        [Tooltip("How far the run snakes left/right, in metres.")]
-        public float pisteCurveAmplitude = 28f;
-        public float pisteCurveFrequency = 0.012f;
+        [Header("Runs")]
+        public PisteDefinition[] pistes =
+        {
+            new PisteDefinition
+            {
+                name = "Larchway", grade = PisteGrade.Intermediate,
+                anchorX = 10f, spreadX = 55f,
+                snakeAmplitude = 24f, snakeFrequency = 0.013f, snakePhase = 0f,
+                halfWidth = 24f, baseExtraWidth = 28f,
+                surfaceNoise = 1.1f, hasRollers = true
+            },
+            new PisteDefinition
+            {
+                name = "Cornice", grade = PisteGrade.Advanced,
+                anchorX = 10f, spreadX = -105f,
+                snakeAmplitude = 20f, snakeFrequency = 0.017f, snakePhase = 1.7f,
+                halfWidth = 16f, baseExtraWidth = 12f,
+                surfaceNoise = 2.6f, hasRollers = false
+            }
+        };
+
+        [Header("How the runs fan out")]
+        [Tooltip("Below this the runs are merged into the base area.")]
+        public float spreadStartZ = 60f;
+        [Tooltip("Above this they are fully apart.")]
+        public float spreadFullZ = 190f;
+        [Tooltip("Where they start converging again towards the summit.")]
+        public float mergeStartZ = 355f;
+        [Tooltip("Above this they share the top station.")]
+        public float mergeEndZ = 402f;
 
         [Header("Valley walls")]
         public float wallFalloff = 45f;
         public float wallHeight = 32f;
-        public float rimStart = 110f;
-        public float rimEnd = 155f;
+        public float rimStart = 180f;
+        public float rimEnd = 225f;
         public float rimHeight = 70f;
 
         [Header("Rollers")]
@@ -63,9 +86,7 @@ namespace SnowBound.Mountain
 
         [Header("Terrain noise")]
         public float noiseScale = 0.012f;
-        [Tooltip("Bumpiness on the groomed run. Keep this small.")]
-        public float pisteNoise = 1.2f;
-        [Tooltip("Bumpiness off the run.")]
+        [Tooltip("Bumpiness off the runs.")]
         public float offPisteNoise = 9f;
         public int seed = 12345;
 
@@ -134,18 +155,63 @@ namespace SnowBound.Mountain
             return maxHeight * Mathf.Pow(t, steepness);
         }
 
-        /// <summary>Middle of the ski run at this z. The run snakes gently.</summary>
-        public float PisteCenterX(float z)
+        public int PisteCount { get { return pistes != null ? pistes.Length : 0; } }
+
+        /// <summary>
+        /// 0 where the runs are merged, 1 where they are fully apart. Zero at
+        /// the base and again at the summit, so one lift serves every run.
+        /// </summary>
+        public float PisteSpread(float z)
         {
-            return Mathf.Sin(z * pisteCurveFrequency) * pisteCurveAmplitude;
+            return Smooth01(spreadStartZ, spreadFullZ, z) * (1f - Smooth01(mergeStartZ, mergeEndZ, z));
         }
 
-        /// <summary>Half width of the ski run at this z (wider near the base).</summary>
-        public float PisteHalfWidth(float z)
+        /// <summary>Middle of run <paramref name="index"/> at this z.</summary>
+        public float PisteCenterX(int index, float z)
         {
-            float k = Smooth01(0f, 90f, z);
-            return pisteHalfWidth + basePisteExtraWidth * (1f - k);
+            if (index < 0 || index >= PisteCount) return 0f;
+
+            PisteDefinition piste = pistes[index];
+            float spread = PisteSpread(z);
+
+            return piste.anchorX
+                 + piste.spreadX * spread
+                 + Mathf.Sin(z * piste.snakeFrequency + piste.snakePhase)
+                   * piste.snakeAmplitude * spread;
         }
+
+        /// <summary>Half width of run <paramref name="index"/> (wider near the base).</summary>
+        public float PisteHalfWidth(int index, float z)
+        {
+            if (index < 0 || index >= PisteCount) return 20f;
+
+            PisteDefinition piste = pistes[index];
+            float k = Smooth01(0f, 90f, z);
+            return piste.halfWidth + piste.baseExtraWidth * (1f - k);
+        }
+
+        /// <summary>
+        /// The run this point belongs to: the one whose edge it is furthest
+        /// inside, or least far outside.
+        /// </summary>
+        public int NearestPiste(float x, float z)
+        {
+            int best = 0;
+            float bestScore = float.MaxValue;
+
+            for (int i = 0; i < PisteCount; i++)
+            {
+                float score = Mathf.Abs(x - PisteCenterX(i, z)) - PisteHalfWidth(i, z);
+                if (score < bestScore) { bestScore = score; best = i; }
+            }
+
+            return best;
+        }
+
+        /// <summary>Middle of the main run. Kept for systems that only need one.</summary>
+        public float PisteCenterX(float z) { return PisteCenterX(0, z); }
+
+        public float PisteHalfWidth(float z) { return PisteHalfWidth(0, z); }
 
         float Fbm(float x, float z)
         {
@@ -167,13 +233,16 @@ namespace SnowBound.Mountain
         /// edges so the piste keeps its shape, and they are what turns the
         /// jump button into something worth pressing.
         /// </summary>
-        float Rollers(float x, float z)
+        float Rollers(float x, float z, int piste)
         {
             if (!rollers || rollerZ == null || rollerZ.Length == 0) return 0f;
             if (rollerLength < 1f || rollerHeight <= 0f) return 0f;
 
-            float half = PisteHalfWidth(z);
-            float across = 1f - Smooth01(half * 0.2f, half * 1.1f, Mathf.Abs(x - PisteCenterX(z)));
+            if (piste < 0 || piste >= PisteCount || !pistes[piste].hasRollers) return 0f;
+
+            float half = PisteHalfWidth(piste, z);
+            float across = 1f - Smooth01(half * 0.2f, half * 1.1f,
+                                         Mathf.Abs(x - PisteCenterX(piste, z)));
             if (across <= 0f) return 0f;
 
             float sum = 0f;
@@ -204,15 +273,21 @@ namespace SnowBound.Mountain
             h = Mathf.Lerp(h, FallLine(topPadZ), kTop);
 
             // Valley walls either side of the run.
-            float d = Mathf.Abs(x - PisteCenterX(z));
-            float wall = Smooth01(PisteHalfWidth(z), PisteHalfWidth(z) + wallFalloff, d);
+            // Each run is carved into the mountain, and the ground between
+            // two of them rises into a ridge of its own accord.
+            int piste = NearestPiste(x, z);
+            float halfWidth = PisteHalfWidth(piste, z);
+            float d = Mathf.Abs(x - PisteCenterX(piste, z));
+            float wall = Smooth01(halfWidth, halfWidth + wallFalloff, d);
             h += wall * wallHeight;
-            h += Smooth01(rimStart, rimEnd, d) * rimHeight;
 
-            // Bumpy off-piste, near-smooth on-piste.
-            h += Fbm(x, z) * Mathf.Lerp(pisteNoise, offPisteNoise, wall);
+            // The rim belongs to the edge of the map, not to any one run.
+            h += Smooth01(rimStart, rimEnd, Mathf.Abs(x)) * rimHeight;
 
-            h += Rollers(x, z);
+            float groomed = piste < PisteCount ? pistes[piste].surfaceNoise : 1.1f;
+            h += Fbm(x, z) * Mathf.Lerp(groomed, offPisteNoise, wall);
+
+            h += Rollers(x, z, piste);
 
             // Berms so the player cannot slide off the front/back edge of the map.
             h += Smooth01(14f, 0f, z) * 22f;
@@ -240,15 +315,23 @@ namespace SnowBound.Mountain
         public bool IsOnPiste(float x, float z, float margin = 0f)
         {
             if (z < 0f || z > length) return false;
-            return Mathf.Abs(x - PisteCenterX(z)) <= PisteHalfWidth(z) + margin;
+
+            for (int i = 0; i < PisteCount; i++)
+            {
+                if (Mathf.Abs(x - PisteCenterX(i, z)) <= PisteHalfWidth(i, z) + margin) return true;
+            }
+
+            return false;
         }
 
-        /// <summary>Middle of the run at this z, on the ground.</summary>
-        public Vector3 PistePoint(float z)
+        /// <summary>Middle of a run at this z, on the ground.</summary>
+        public Vector3 PistePoint(int index, float z)
         {
-            float x = PisteCenterX(z);
+            float x = PisteCenterX(index, z);
             return new Vector3(x, SampleHeight(x, z), z);
         }
+
+        public Vector3 PistePoint(float z) { return PistePoint(0, z); }
 
         // ---------------- mesh building ----------------------------------
 

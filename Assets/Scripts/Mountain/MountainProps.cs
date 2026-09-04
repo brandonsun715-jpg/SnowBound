@@ -25,7 +25,7 @@ namespace SnowBound.Mountain
         public MountainGenerator mountain;
 
         [Header("Pine trees")]
-        public int treeCount = 500;
+        public int treeCount = 900;
         [Tooltip("No trees are placed above this height (metres).")]
         public float treeLine = 130f;
         [Tooltip("Keep trees this far away from the edge of the ski run.")]
@@ -35,7 +35,7 @@ namespace SnowBound.Mountain
         public float maxTreeSlopeDeg = 45f;
 
         [Header("Rocks")]
-        public int rockCount = 140;
+        public int rockCount = 210;
         public float minRockSize = 1.5f;
         public float maxRockSize = 5f;
 
@@ -275,22 +275,46 @@ namespace SnowBound.Mountain
             var pole = new Piece();
             PrimitiveMeshes.AddTube(pole.verts, pole.tris, Vector3.zero, 0f, 1.9f, 0.07f, 0.05f, 6);
 
+            // Outer edge orange as they are on a real mountain; inner edge in
+            // the run's own grade colour, so you can read which run you are on.
             Material orange = MaterialFactory.Create("MarkerOrange", new Color(0.95f, 0.42f, 0.05f), 0.1f);
+            Material green = MaterialFactory.Create("MarkerGreen", new Color(0.10f, 0.62f, 0.28f), 0.1f);
             Material blue = MaterialFactory.Create("MarkerBlue", new Color(0.10f, 0.35f, 0.85f), 0.1f);
+            Material red = MaterialFactory.Create("MarkerRed", new Color(0.82f, 0.11f, 0.13f), 0.1f);
 
-            var batch = new MeshBatcher(parent, "PisteMarkers", new[] { orange, blue });
+            var batch = new MeshBatcher(parent, "PisteMarkers", new[] { orange, green, blue, red });
 
             if (markerSpacing < 5f) markerSpacing = 5f;
 
-            for (float z = 25f; z < mountain.length - 25f; z += markerSpacing)
+            for (int i = 0; i < mountain.PisteCount; i++)
             {
-                float centre = mountain.PisteCenterX(z);
-                float half = mountain.PisteHalfWidth(z);
-                Marker(batch, 0, centre - half - 1.5f, z, pole);
-                Marker(batch, 1, centre + half + 1.5f, z, pole);
+                int gradeSlot = GradeSlot(mountain.pistes[i].grade);
+
+                for (float z = 25f; z < mountain.length - 25f; z += markerSpacing)
+                {
+                    // Near the base and the summit the runs lie on top of one
+                    // another, so only the first one is marked there.
+                    if (i > 0 && mountain.PisteSpread(z) < 0.15f) continue;
+
+                    float centre = mountain.PisteCenterX(i, z);
+                    float half = mountain.PisteHalfWidth(i, z);
+
+                    Marker(batch, gradeSlot, centre - half - 1.5f, z, pole);
+                    Marker(batch, 0, centre + half + 1.5f, z, pole);
+                }
             }
 
             batch.Flush();
+        }
+
+        static int GradeSlot(PisteGrade grade)
+        {
+            switch (grade)
+            {
+                case PisteGrade.Beginner: return 1;
+                case PisteGrade.Advanced: return 3;
+                default: return 2;
+            }
         }
 
         void Marker(MeshBatcher batch, int slot, float x, float z, Piece pole)

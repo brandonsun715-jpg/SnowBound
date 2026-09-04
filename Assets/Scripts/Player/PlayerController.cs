@@ -60,6 +60,12 @@ namespace SnowBound.Player
         /// Spray and tracks check this, so neither happens on the lodge deck.
         /// </summary>
         public bool OnSnow { get; private set; }
+
+        /// <summary>
+        /// Multiplier on snow drag for whatever is underfoot. 1 on snow, far
+        /// lower on a park box, because steel does not hold you back.
+        /// </summary>
+        public float SurfaceFriction { get; private set; } = 1f;
         public Vector3 GroundNormal { get; private set; } = Vector3.up;
         public float GroundSlopeDegrees { get; private set; }
         public LocomotionKind CurrentKind => _active != null ? _active.Kind : startMode;
@@ -98,6 +104,7 @@ namespace SnowBound.Player
         PlayerVisual _visual;
         Collider _groundCollider;
         bool _groundIsSnow;
+        float _groundFriction = 1f;
         Transform _seat;
         Vector3 _seatOffset;
         LocomotionMode _active;
@@ -183,13 +190,22 @@ namespace SnowBound.Player
                 }
             }
 
-            // Only look the marker up when the surface actually changes.
+            // Only look the markers up when the surface actually changes.
             if (surface != _groundCollider)
             {
                 _groundCollider = surface;
                 _groundIsSnow = surface != null && surface.GetComponent<SnowSurface>() != null;
+
+                _groundFriction = 1f;
+                if (surface != null)
+                {
+                    var slick = surface.GetComponent<SlickSurface>();
+                    if (slick != null) _groundFriction = slick.frictionScale;
+                }
             }
+
             OnSnow = IsGrounded && _groundIsSnow;
+            SurfaceFriction = IsGrounded ? _groundFriction : 1f;
 
             if (!IsGrounded) GroundNormal = Vector3.up;
             else if (!wasGrounded) GroundNormal = raw;   // land on the real slope at once

@@ -68,6 +68,9 @@ namespace SnowBound.EditorTools
             var props = gen.GetComponent<MountainProps>();
             if (props != null) props.Build();
 
+            var park = gen.GetComponent<TerrainPark>();
+            if (park != null) park.Build();
+
             var lodge = Object.FindAnyObjectByType<LodgeBuilder>();
             if (lodge != null) lodge.Build();
 
@@ -151,9 +154,11 @@ namespace SnowBound.EditorTools
 
             var gen = go.AddComponent<MountainGenerator>();
             var props = go.AddComponent<MountainProps>();
+            var park = go.AddComponent<TerrainPark>();
 
             gen.Build();
             props.Build();
+            park.Build();
         }
 
         static void CreateChairlift()

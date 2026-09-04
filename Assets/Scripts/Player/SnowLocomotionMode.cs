@@ -112,7 +112,8 @@ namespace SnowBound.Player
             if (speed > 0.01f)
             {
                 float drag = tuck ? S.tuckAirDrag : S.airDrag;
-                float loss = (S.snowFriction * DragScale + drag * speed * speed) * dt;
+                float loss = (S.snowFriction * DragScale * Player.SurfaceFriction
+                            + drag * speed * speed) * dt;
                 loss += Mathf.Abs(steer) * speed * S.carveScrub * dt;
                 if (brake) loss += S.brakeStrength * dt;
 

@@ -63,7 +63,16 @@ Milestone 1 is complete.
    falling snow and how the mountain rides. *(done)*
 3. **Audio** — wind, the hiss of snow under an edge, footfalls, landings and
    the lift motor, all generated in code. *(done)*
-4. More of the mountain: a second run, a terrain park.
+4. **More mountain** — a second, harder run and a snow park. *(done)*
+
+Milestone 2 is complete.
+
+## Milestone 3 — depth
+
+1. Rail grinding, tricks and scoring.
+2. Guests skiing the mountain.
+3. Saving and loading.
+4. The tycoon layer: building runs and lifts rather than generating them.
 
 ## Building the scene
 
@@ -135,6 +144,15 @@ fail because of a mistimed button press.
   underfoot, what the sky is doing — never the keyboard. So hardpack rings
   and deep powder swallows the high frequencies, without either being
   special-cased.
+- The mountain holds a list of `PisteDefinition`s rather than one run. They
+  fan out from the base area, spread apart through the middle and converge
+  again at the summit, so one lift serves all of them. The terrain carves
+  towards whichever run is nearest, which means the ridge between two runs
+  appears on its own rather than being modelled.
+- `SlickSurface` sits alongside `SnowSurface` because they answer different
+  questions: one is "does this leave a track?", the other is "how much does
+  it hold you back?". A park box is slick and not snow; a kicker is snow and
+  not slick.
 - Weather is one number. `WeatherSystem.storminess` drives the fog, the sun,
   the ambient light and the snowfall together, so they can never disagree.
   Snow on the ground is tracked separately as powder, which builds while it
