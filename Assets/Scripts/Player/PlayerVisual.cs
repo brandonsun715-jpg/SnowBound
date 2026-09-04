@@ -4,10 +4,11 @@ using SnowBound.Core;
 namespace SnowBound.Player
 {
     /// <summary>
-    /// The placeholder body: a skier built from Unity primitives. It is only
-    /// ever a child of the player object and carries no colliders, so
-    /// replacing it with a real rigged model later means deleting this
-    /// component and dropping the model in. Nothing else changes.
+    /// The placeholder body: a rider built from Unity primitives, split into
+    /// a body group and one group per bit of gear. Nothing here has a
+    /// collider and nothing here drives gameplay, so swapping in a real
+    /// rigged model later means deleting this component and dropping the
+    /// model in as a child. No other script changes.
     /// </summary>
     [ExecuteAlways]
     public class PlayerVisual : MonoBehaviour
@@ -20,8 +21,14 @@ namespace SnowBound.Player
         public Color helmet = new Color(0.12f, 0.13f, 0.16f);
         public Color gear = new Color(0.20f, 0.62f, 0.85f);
 
+        Transform _body;
         Transform _skis;
         Transform _board;
+
+        // Remembered so the state survives a rebuild, whatever order the
+        // player's components happen to start in.
+        LocomotionKind _shownGear = LocomotionKind.Walk;
+        float _bodyYaw;
 
         void Start() { Build(); }
 
@@ -55,63 +62,92 @@ namespace SnowBound.Player
             Material helmetMat = MaterialFactory.Create("PlayerHelmet", helmet, 0.35f);
             Material gearMat = MaterialFactory.Create("PlayerGear", gear, 0.35f);
 
-            // Legs.
-            for (int side = -1; side <= 1; side += 2)
-            {
-                Part(root.transform, PrimitiveType.Capsule, "Leg",
-                     new Vector3(side * 0.13f, 0.44f, 0f),
-                     new Vector3(0.26f, 0.42f, 0.26f), trouserMat);
-            }
+            BuildBody(root.transform, jacketMat, trouserMat, helmetMat, gearMat);
+            BuildSkis(root.transform, gearMat, helmetMat);
+            BuildBoard(root.transform, gearMat);
 
-            Part(root.transform, PrimitiveType.Capsule, "Torso",
-                 new Vector3(0f, 1.18f, 0f), new Vector3(0.62f, 0.34f, 0.42f), jacketMat);
-
-            // Arms.
-            for (int side = -1; side <= 1; side += 2)
-            {
-                Part(root.transform, PrimitiveType.Capsule, "Arm",
-                     new Vector3(side * 0.34f, 1.20f, 0f),
-                     new Vector3(0.18f, 0.28f, 0.18f), jacketMat);
-            }
-
-            Part(root.transform, PrimitiveType.Cube, "Backpack",
-                 new Vector3(0f, 1.20f, -0.26f), new Vector3(0.40f, 0.46f, 0.20f), gearMat);
-
-            Part(root.transform, PrimitiveType.Sphere, "Head",
-                 new Vector3(0f, 1.66f, 0f), new Vector3(0.32f, 0.34f, 0.32f), helmetMat);
-
-            Part(root.transform, PrimitiveType.Cube, "Goggles",
-                 new Vector3(0f, 1.70f, 0.13f), new Vector3(0.28f, 0.09f, 0.08f), gearMat);
-
-            // Gear, hidden until the player puts it on.
-            var skis = new GameObject("Skis");
-            skis.transform.SetParent(root.transform, false);
-            for (int side = -1; side <= 1; side += 2)
-            {
-                Part(skis.transform, PrimitiveType.Cube, "Ski",
-                     new Vector3(side * 0.15f, 0.03f, 0.20f),
-                     new Vector3(0.12f, 0.05f, 1.75f), gearMat);
-            }
-            _skis = skis.transform;
-
-            var board = new GameObject("Snowboard");
-            board.transform.SetParent(root.transform, false);
-            Part(board.transform, PrimitiveType.Cube, "Board",
-                 new Vector3(0f, 0.03f, 0.05f), new Vector3(0.34f, 0.05f, 1.55f), gearMat);
-            _board = board.transform;
-
-            ShowGear(LocomotionKind.Walk);
+            ShowGear(_shownGear);
+            SetBodyYawOffset(_bodyYaw);
 
             foreach (Transform tr in root.GetComponentsInChildren<Transform>(true))
                 tr.gameObject.hideFlags = HideFlags.DontSaveInEditor;
         }
 
-        /// <summary>Swap what is strapped to the player's feet.</summary>
+        void BuildBody(Transform root, Material jacketMat, Material trouserMat,
+                       Material helmetMat, Material gearMat)
+        {
+            var body = new GameObject("Body");
+            body.transform.SetParent(root, false);
+            _body = body.transform;
+
+            for (int side = -1; side <= 1; side += 2)
+            {
+                Part(_body, PrimitiveType.Capsule, "Leg",
+                     new Vector3(side * 0.13f, 0.44f, 0f),
+                     new Vector3(0.26f, 0.42f, 0.26f), trouserMat);
+
+                Part(_body, PrimitiveType.Capsule, "Arm",
+                     new Vector3(side * 0.34f, 1.20f, 0f),
+                     new Vector3(0.18f, 0.28f, 0.18f), jacketMat);
+            }
+
+            Part(_body, PrimitiveType.Capsule, "Torso",
+                 new Vector3(0f, 1.18f, 0f), new Vector3(0.62f, 0.34f, 0.42f), jacketMat);
+
+            Part(_body, PrimitiveType.Cube, "Backpack",
+                 new Vector3(0f, 1.20f, -0.26f), new Vector3(0.40f, 0.46f, 0.20f), gearMat);
+
+            Part(_body, PrimitiveType.Sphere, "Head",
+                 new Vector3(0f, 1.66f, 0f), new Vector3(0.32f, 0.34f, 0.32f), helmetMat);
+
+            Part(_body, PrimitiveType.Cube, "Goggles",
+                 new Vector3(0f, 1.70f, 0.13f), new Vector3(0.28f, 0.09f, 0.08f), gearMat);
+        }
+
+        void BuildSkis(Transform root, Material gearMat, Material poleMat)
+        {
+            var skis = new GameObject("Skis");
+            skis.transform.SetParent(root, false);
+            _skis = skis.transform;
+
+            for (int side = -1; side <= 1; side += 2)
+            {
+                Part(_skis, PrimitiveType.Cube, "Ski",
+                     new Vector3(side * 0.15f, 0.03f, 0.20f),
+                     new Vector3(0.12f, 0.05f, 1.75f), gearMat);
+
+                Part(_skis, PrimitiveType.Cube, "Pole",
+                     new Vector3(side * 0.44f, 0.62f, -0.08f),
+                     new Vector3(0.045f, 1.25f, 0.045f), poleMat);
+            }
+        }
+
+        void BuildBoard(Transform root, Material gearMat)
+        {
+            var board = new GameObject("Snowboard");
+            board.transform.SetParent(root, false);
+            _board = board.transform;
+
+            Part(_board, PrimitiveType.Cube, "Board",
+                 new Vector3(0f, 0.03f, 0.05f), new Vector3(0.34f, 0.05f, 1.55f), gearMat);
+        }
+
+        /// <summary>Swap what is strapped to the rider's feet.</summary>
         public void ShowGear(LocomotionKind kind)
         {
-            if (_skis == null || _board == null) return;
-            _skis.gameObject.SetActive(kind == LocomotionKind.Ski);
-            _board.gameObject.SetActive(kind == LocomotionKind.Snowboard);
+            _shownGear = kind;
+            if (_skis != null) _skis.gameObject.SetActive(kind == LocomotionKind.Ski);
+            if (_board != null) _board.gameObject.SetActive(kind == LocomotionKind.Snowboard);
+        }
+
+        /// <summary>
+        /// Turn the body away from the direction of travel. A snowboarder
+        /// rides side-on while the board still points down the hill.
+        /// </summary>
+        public void SetBodyYawOffset(float degrees)
+        {
+            _bodyYaw = degrees;
+            if (_body != null) _body.localRotation = Quaternion.Euler(0f, degrees, 0f);
         }
 
         void Part(Transform parent, PrimitiveType shape, string name,

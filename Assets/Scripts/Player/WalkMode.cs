@@ -22,6 +22,15 @@ namespace SnowBound.Player
         [Tooltip("Metres. How high a standing jump goes.")]
         public float jumpHeight = 1.1f;
 
+        public override void OnEnter()
+        {
+            // Snow modes tilt the body to the slope. Stand back up.
+            Vector3 flat = Player.transform.forward;
+            flat.y = 0f;
+            if (flat.sqrMagnitude > 0.0001f)
+                Player.transform.rotation = Quaternion.LookRotation(flat.normalized, Vector3.up);
+        }
+
         public override void Tick(float dt)
         {
             Vector2 move = Player.Input.Move;

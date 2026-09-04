@@ -156,6 +156,8 @@ namespace SnowBound.EditorTools
             go.AddComponent<PlayerInputReader>();
             go.AddComponent<PlayerVisual>();
             go.AddComponent<WalkMode>();
+            go.AddComponent<SkiMode>();
+            go.AddComponent<SnowboardMode>();
             go.AddComponent<PlayerController>();
 
             var lodge = Object.FindAnyObjectByType<LodgeBuilder>();
@@ -172,6 +174,7 @@ namespace SnowBound.EditorTools
             if (rig == null) rig = cam.gameObject.AddComponent<ThirdPersonCamera>();
             rig.target = player.transform;
             rig.input = player.GetComponent<PlayerInputReader>();
+            rig.player = player;
         }
 
         static void CreateLodge()

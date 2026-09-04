@@ -19,6 +19,8 @@ namespace SnowBound.Player
         public float gravity = -25f;
         [Tooltip("Layers counted as ground. Leave as Everything.")]
         public LayerMask groundMask = ~0;
+        [Tooltip("The terrain mesh is faceted, so raw hit normals step from one\ntriangle to the next. Smoothing them keeps the ride steady.")]
+        public float groundNormalSmoothing = 14f;
 
         [Header("Start")]
         public LocomotionKind startMode = LocomotionKind.Walk;
@@ -31,6 +33,20 @@ namespace SnowBound.Player
         public PlayerInputReader Input { get; private set; }
 
         public Vector3 Velocity;
+
+        /// <summary>
+        /// Downward push that keeps the rider glued to the snow. Kept out of
+        /// Velocity on purpose: if it lived there, it would be carried into
+        /// the air and kill every jump off a roller.
+        /// </summary>
+        public Vector3 GroundStick;
+
+        /// <summary>
+        /// How hard the edges are sliding sideways, metres per second.
+        /// Snow spray and tracks read this in the next step.
+        /// </summary>
+        public float LateralSlip;
+
         public bool IsGrounded { get; private set; }
         public Vector3 GroundNormal { get; private set; } = Vector3.up;
         public float GroundSlopeDegrees { get; private set; }
@@ -93,7 +109,8 @@ namespace SnowBound.Player
 
             if (_active != null) _active.Tick(dt);
 
-            Body.Move(Velocity * dt);
+            Body.Move((Velocity + GroundStick) * dt);
+            GroundStick = Vector3.zero;
         }
 
         // ---------------- ground ----------------------------------------
@@ -106,8 +123,9 @@ namespace SnowBound.Player
             int n = Physics.SphereCastNonAlloc(origin, radius, Vector3.down, _hits,
                                                0.5f, groundMask, QueryTriggerInteraction.Ignore);
 
+            bool wasGrounded = IsGrounded;
             IsGrounded = false;
-            GroundNormal = Vector3.up;
+            Vector3 raw = Vector3.up;
             float nearest = float.MaxValue;
 
             for (int i = 0; i < n; i++)
@@ -126,9 +144,14 @@ namespace SnowBound.Player
                 {
                     nearest = h.distance;
                     IsGrounded = true;
-                    GroundNormal = h.normal;
+                    raw = h.normal;
                 }
             }
+
+            if (!IsGrounded) GroundNormal = Vector3.up;
+            else if (!wasGrounded) GroundNormal = raw;   // land on the real slope at once
+            else GroundNormal = Vector3.Slerp(GroundNormal, raw,
+                                              1f - Mathf.Exp(-groundNormalSmoothing * Time.deltaTime));
 
             GroundSlopeDegrees = Vector3.Angle(GroundNormal, Vector3.up);
         }
@@ -163,7 +186,11 @@ namespace SnowBound.Player
             _active = next;
             _active.OnEnter();
 
-            if (_visual != null) _visual.ShowGear(kind);
+            if (_visual != null)
+            {
+                _visual.ShowGear(kind);
+                _visual.SetBodyYawOffset(_active.BodyYawOffset);
+            }
         }
 
         // ---------------- placement -------------------------------------

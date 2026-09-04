@@ -40,7 +40,7 @@ Assets/
 1. **Mountain** — terrain mesh, pine trees, rocks, piste markers. *(done)*
 2. **Lodge and base area** — building, deck, entrance point. *(done)*
 3. **Player** — walking, gravity, jumping, third-person camera. *(done)*
-4. Skiing and snowboarding movement modes.
+4. **Skiing and snowboarding** — momentum, edges, carving, braking. *(done)*
 5. Snow spray and tracks.
 6. Chairlift.
 7. Loop glue: gear swap at the lodge, start/finish areas.
@@ -58,13 +58,29 @@ props after changing generator settings.
 
 ## Controls
 
+**On foot**
+
 | Input | Action |
 |---|---|
 | `W A S D` | Move, relative to the camera |
+| `Shift` | Run |
+| `Space` | Jump |
+
+**On skis or a board**
+
+| Input | Action |
+|---|---|
+| `A` / `D` | Steer |
+| `W` | Tuck for speed, or skate on the flat |
+| `S` or `Ctrl` | Brake |
+| `Space` | Jump |
+
+**Always**
+
+| Input | Action |
+|---|---|
 | Mouse | Turn the camera |
 | Scroll wheel | Zoom in / out |
-| `Space` | Jump |
-| `Shift` | Run |
 | `1` / `2` / `3` | Walk / ski / snowboard |
 | `Esc` | Release the mouse cursor (in the editor) |
 
@@ -76,6 +92,12 @@ props after changing generator settings.
   body, gravity and the ground probe; a `LocomotionMode` component decides
   only how velocity and facing change. Skiing and snowboarding drop into the
   same slot, so they can feel nothing like walking.
+- Snow riding is not walking with a bigger number. The rider has a heading
+  (where the edges point) and a velocity (where they are actually going), and
+  those are allowed to disagree. Gravity pulls along the slope, the edges
+  scrub off sideways drift, and turning costs speed. Skis grip hard and turn
+  tightly; the board grips about half as much and turns slower, so it washes
+  out into wide drifting arcs. All the difference lives in `SnowRideSettings`.
 - `PlayerInputReader` is the only file that touches the keyboard and mouse,
   and compiles against either Unity input backend.
 - `MountainGenerator` is the single source of truth for ground height.

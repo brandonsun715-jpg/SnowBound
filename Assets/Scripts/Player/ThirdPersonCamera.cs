@@ -25,6 +25,17 @@ namespace SnowBound.Player
         public float maxPitch = 70f;
         public float startPitch = 14f;
 
+        [Header("Speed")]
+        [Tooltip("Optional. Lets the camera drop back and widen out as you gain speed.")]
+        public PlayerController player;
+        [Tooltip("Speed, m/s, at which the speed effects reach full strength.")]
+        public float fastSpeed = 24f;
+        [Tooltip("Extra metres the camera falls back at full speed.")]
+        public float speedPullback = 3f;
+        public float restingFieldOfView = 60f;
+        [Tooltip("Widening the lens is most of why fast feels fast.")]
+        public float fastFieldOfView = 74f;
+
         [Header("Collision")]
         public float collisionRadius = 0.32f;
         public LayerMask collisionMask = ~0;
@@ -35,10 +46,12 @@ namespace SnowBound.Player
         float _yaw;
         float _pitch;
         float _currentDistance;
+        Camera _camera;
         readonly RaycastHit[] _hits = new RaycastHit[8];
 
         void Start()
         {
+            _camera = GetComponent<Camera>();
             _pitch = startPitch;
             _yaw = target != null ? target.eulerAngles.y : 0f;
             _currentDistance = distance;
@@ -62,11 +75,20 @@ namespace SnowBound.Player
                 distance = Mathf.Clamp(distance - input.Zoom * zoomSpeed, minDistance, maxDistance);
             }
 
+            float rush = player != null ? Mathf.Clamp01(player.Speed / fastSpeed) : 0f;
+
+            if (_camera != null)
+            {
+                float wantFov = Mathf.Lerp(restingFieldOfView, fastFieldOfView, rush);
+                _camera.fieldOfView = Mathf.Lerp(_camera.fieldOfView, wantFov,
+                                                 1f - Mathf.Exp(-4f * Time.deltaTime));
+            }
+
             Quaternion rotation = Quaternion.Euler(_pitch, _yaw, 0f);
             Vector3 focus = target.position + Vector3.up * focusHeight;
             Vector3 back = rotation * Vector3.back;
 
-            float wanted = ClearDistance(focus, back, distance);
+            float wanted = ClearDistance(focus, back, distance + rush * speedPullback);
             // Snap in fast so the camera never clips, ease out slowly.
             float ease = wanted < _currentDistance ? 1f : 1f - Mathf.Exp(-8f * Time.deltaTime);
             _currentDistance = Mathf.Lerp(_currentDistance, wanted, ease);

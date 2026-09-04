@@ -26,6 +26,10 @@ namespace SnowBound.Player
 
         public void Bind(PlayerController player) { Player = player; }
 
+        /// <summary>Degrees to turn the body away from the direction of travel.
+        /// Zero for skiing; a snowboarder rides side-on.</summary>
+        public virtual float BodyYawOffset => 0f;
+
         public virtual void OnEnter() { }
         public virtual void OnExit() { }
 
