@@ -28,6 +28,7 @@ Assets/
     Lifts/                chairlift path, chairs and operation
     Game/                 loop rules: gear rack, run timing
     Weather/              sky, snowfall, snow conditions
+    Audio/                what the ride and the lift sound like
     UI/                   heads-up display
     Player/               character, locomotion modes, input, camera
     Mountain/             terrain generation and scene dressing
@@ -60,7 +61,8 @@ Milestone 1 is complete.
    *(done)*
 2. **Weather and changing snow** — one storminess dial driving light, fog,
    falling snow and how the mountain rides. *(done)*
-3. Audio.
+3. **Audio** — wind, the hiss of snow under an edge, footfalls, landings and
+   the lift motor, all generated in code. *(done)*
 4. More of the mountain: a second run, a terrain park.
 
 ## Building the scene
@@ -124,6 +126,15 @@ fail because of a mistimed button press.
   body, gravity and the ground probe; a `LocomotionMode` component decides
   only how velocity and facing change. Skiing and snowboarding drop into the
   same slot, so they can feel nothing like walking.
+- There are no sound files. `Core/ProceduralAudio` writes the audio as
+  arithmetic: wind and the hiss of an edge are filtered pink noise, the lift
+  motor is a stack of harmonics over a rumble, a landing is a burst that
+  decays. Loops are folded end over start so they never click, and tonal
+  loops use whole numbers of cycles so the waveform meets itself exactly.
+- Audio reads the same state the spray does — speed, sideways slip, what is
+  underfoot, what the sky is doing — never the keyboard. So hardpack rings
+  and deep powder swallows the high frequencies, without either being
+  special-cased.
 - Weather is one number. `WeatherSystem.storminess` drives the fog, the sun,
   the ambient light and the snowfall together, so they can never disagree.
   Snow on the ground is tracked separately as powder, which builds while it

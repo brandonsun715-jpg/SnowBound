@@ -11,6 +11,7 @@ using SnowBound.Lifts;
 using SnowBound.Game;
 using SnowBound.Hud;
 using SnowBound.Weather;
+using SnowBound.Audio;
 
 namespace SnowBound.EditorTools
 {
@@ -162,6 +163,7 @@ namespace SnowBound.EditorTools
             var go = new GameObject("Chairlift");
             go.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
             go.AddComponent<Chairlift>().Build();
+            go.AddComponent<LiftAudio>();
         }
 
         static void CreatePlayer()
@@ -185,6 +187,7 @@ namespace SnowBound.EditorTools
             go.AddComponent<SnowboardMode>();
             go.AddComponent<SnowSpray>();
             go.AddComponent<SnowTrackWriter>();
+            go.AddComponent<RideAudio>();
             go.AddComponent<PlayerController>();
 
             var lodge = Object.FindAnyObjectByType<LodgeBuilder>();
