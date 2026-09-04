@@ -70,7 +70,7 @@ namespace SnowBound.Mountain
         {
             get
             {
-                if (_instance == null) _instance = FindFirstObjectByType<MountainGenerator>();
+                if (_instance == null) _instance = FindAnyObjectByType<MountainGenerator>();
                 return _instance;
             }
         }
