@@ -171,8 +171,9 @@ namespace SnowBound.Mountain
                 float x = Rand(-halfW + 8f, halfW - 8f);
                 float z = Rand(10f, mountain.length - 10f);
 
-                // A few rocks may sit near the run, but never in the middle of it.
-                if (mountain.IsOnPiste(x, z, -6f)) continue;
+                // Strictly off-piste: keeps the run clean and keeps rocks
+                // out of the base area where the lodge stands.
+                if (mountain.IsOnPiste(x, z, 2f)) continue;
 
                 float sx = Rand(minRockSize, maxRockSize);
                 float sy = sx * Rand(0.5f, 0.9f);

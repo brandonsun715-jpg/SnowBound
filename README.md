@@ -24,6 +24,7 @@ Assets/
   Scripts/
     Core/                 shared helpers (procedural meshes, materials)
     Editor/               editor-only tools (scene builder menu)
+    Buildings/            resort buildings (lodge today, more with the tycoon)
     Player/               character, movement modes, camera
     Mountain/             terrain generation and scene dressing
     Lifts/                chairlift
@@ -37,7 +38,7 @@ Assets/
 ## Build order
 
 1. **Mountain** — terrain mesh, pine trees, rocks, piste markers. *(done)*
-2. Lodge and base area.
+2. **Lodge and base area** — building, deck, entrance point. *(done)*
 3. Player: walking, gravity, jumping, third-person camera.
 4. Skiing and snowboarding movement modes.
 5. Snow spray and tracks.
@@ -57,6 +58,8 @@ props after changing generator settings.
 
 ## Notes
 
+- `LodgeBuilder.EntrancePosition` is where the player spawns and swaps gear.
+  Other systems read it rather than hard-coding a position.
 - `MountainGenerator` is the single source of truth for ground height.
   Other systems call `SampleHeight(x, z)`, `PisteCenterX(z)` and
   `PistePoint(z)` instead of guessing or raycasting.

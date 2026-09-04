@@ -39,5 +39,20 @@ namespace SnowBound.Core
             m.hideFlags = HideFlags.DontSave;
             return m;
         }
+
+        /// <summary>A material that glows, for warm lodge windows and lamps.</summary>
+        public static Material CreateEmissive(string name, Color color, Color emission)
+        {
+            var m = Create(name, color, 0.1f);
+
+            if (m.HasProperty("_EmissionColor"))
+            {
+                m.EnableKeyword("_EMISSION");
+                m.SetColor("_EmissionColor", emission);
+                m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+            }
+
+            return m;
+        }
     }
 }

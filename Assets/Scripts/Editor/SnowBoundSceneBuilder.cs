@@ -5,6 +5,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
 using SnowBound.Mountain;
+using SnowBound.Buildings;
 
 namespace SnowBound.EditorTools
 {
@@ -32,6 +33,7 @@ namespace SnowBound.EditorTools
             ConfigureSun();
             ConfigureEnvironment();
             CreateMountain();
+            CreateLodge();
 
             Directory.CreateDirectory(SceneFolder);
             AssetDatabase.Refresh();
@@ -54,6 +56,9 @@ namespace SnowBound.EditorTools
             gen.Build();
             var props = gen.GetComponent<MountainProps>();
             if (props != null) props.Build();
+
+            var lodge = Object.FindAnyObjectByType<LodgeBuilder>();
+            if (lodge != null) lodge.Build();
 
             Debug.Log("[SnowBound] Mountain rebuilt.");
         }
@@ -129,6 +134,15 @@ namespace SnowBound.EditorTools
 
             gen.Build();
             props.Build();
+        }
+
+        static void CreateLodge()
+        {
+            if (Object.FindAnyObjectByType<LodgeBuilder>() != null) return;
+
+            var go = new GameObject("Lodge");
+            go.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+            go.AddComponent<LodgeBuilder>().Build();
         }
     }
 }

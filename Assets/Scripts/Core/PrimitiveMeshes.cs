@@ -57,6 +57,49 @@ namespace SnowBound.Core
         }
 
         /// <summary>
+        /// Appends a triangular prism: the classic gable roof shape. The
+        /// triangle sits in the X/Y plane and is extruded along Z, so the
+        /// ridge runs along Z and the gable ends face forward and back.
+        /// Base sits at y = 0. Faces do not share vertices, so the roof keeps
+        /// crisp edges instead of looking melted.
+        /// </summary>
+        public static void AddPrism(List<Vector3> verts, List<int> tris,
+                                    Vector3 center, float halfWidth, float height, float length)
+        {
+            float hl = length * 0.5f;
+
+            Vector3 a = center + new Vector3(-halfWidth, 0f, -hl);
+            Vector3 b = center + new Vector3(halfWidth, 0f, -hl);
+            Vector3 c = center + new Vector3(0f, height, -hl);
+            Vector3 d = center + new Vector3(-halfWidth, 0f, hl);
+            Vector3 e = center + new Vector3(halfWidth, 0f, hl);
+            Vector3 f = center + new Vector3(0f, height, hl);
+
+            AddTri(verts, tris, a, c, b);        // gable end, front
+            AddTri(verts, tris, d, e, f);        // gable end, back
+            AddQuad(verts, tris, a, d, f, c);    // left slope
+            AddQuad(verts, tris, b, c, f, e);    // right slope
+            AddQuad(verts, tris, a, b, e, d);    // underside
+        }
+
+        public static void AddTri(List<Vector3> verts, List<int> tris,
+                                  Vector3 p0, Vector3 p1, Vector3 p2)
+        {
+            int s = verts.Count;
+            verts.Add(p0); verts.Add(p1); verts.Add(p2);
+            tris.Add(s); tris.Add(s + 1); tris.Add(s + 2);
+        }
+
+        public static void AddQuad(List<Vector3> verts, List<int> tris,
+                                   Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3)
+        {
+            int s = verts.Count;
+            verts.Add(p0); verts.Add(p1); verts.Add(p2); verts.Add(p3);
+            tris.Add(s); tris.Add(s + 1); tris.Add(s + 2);
+            tris.Add(s); tris.Add(s + 2); tris.Add(s + 3);
+        }
+
+        /// <summary>
         /// Finishes a mesh. Pass one triangle list per sub-mesh; the renderer's
         /// material slots line up with the order you pass them in.
         /// </summary>
