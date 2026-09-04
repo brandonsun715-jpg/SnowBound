@@ -7,6 +7,9 @@ using UnityEngine.Rendering;
 using SnowBound.Mountain;
 using SnowBound.Buildings;
 using SnowBound.Player;
+using SnowBound.Lifts;
+using SnowBound.Game;
+using SnowBound.Hud;
 
 namespace SnowBound.EditorTools
 {
@@ -35,8 +38,10 @@ namespace SnowBound.EditorTools
             ConfigureEnvironment();
             CreateMountain();
             CreateLodge();
+            CreateChairlift();
             CreatePlayer();
             AttachCamera();
+            CreateGameRules();
 
             Directory.CreateDirectory(SceneFolder);
             AssetDatabase.Refresh();
@@ -62,6 +67,15 @@ namespace SnowBound.EditorTools
 
             var lodge = Object.FindAnyObjectByType<LodgeBuilder>();
             if (lodge != null) lodge.Build();
+
+            var lift = Object.FindAnyObjectByType<Chairlift>();
+            if (lift != null) lift.Build();
+
+            var rack = Object.FindAnyObjectByType<GearRack>();
+            if (rack != null) rack.Build();
+
+            var gates = Object.FindAnyObjectByType<RunTimer>();
+            if (gates != null) gates.Build();
 
             Debug.Log("[SnowBound] Mountain rebuilt.");
         }
@@ -139,6 +153,15 @@ namespace SnowBound.EditorTools
             props.Build();
         }
 
+        static void CreateChairlift()
+        {
+            if (Object.FindAnyObjectByType<Chairlift>() != null) return;
+
+            var go = new GameObject("Chairlift");
+            go.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+            go.AddComponent<Chairlift>().Build();
+        }
+
         static void CreatePlayer()
         {
             if (Object.FindAnyObjectByType<PlayerController>() != null) return;
@@ -164,6 +187,17 @@ namespace SnowBound.EditorTools
 
             var lodge = Object.FindAnyObjectByType<LodgeBuilder>();
             if (lodge != null) go.transform.position = lodge.EntrancePosition + Vector3.up * 0.3f;
+        }
+
+        static void CreateGameRules()
+        {
+            if (Object.FindAnyObjectByType<GearRack>() != null) return;
+
+            var go = new GameObject("Game");
+            go.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+            go.AddComponent<GearRack>().Build();
+            go.AddComponent<RunTimer>().Build();
+            go.AddComponent<GameHud>();
         }
 
         static void AttachCamera()

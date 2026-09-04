@@ -17,6 +17,7 @@ namespace SnowBound.Mountain
     [RequireComponent(typeof(MeshFilter))]
     [RequireComponent(typeof(MeshRenderer))]
     [RequireComponent(typeof(MeshCollider))]
+    [RequireComponent(typeof(SnowSurface))]
     public class MountainGenerator : MonoBehaviour
     {
         [Header("Size (metres)")]

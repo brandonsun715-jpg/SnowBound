@@ -71,7 +71,7 @@ namespace SnowBound.Player
         {
             if (player == null) return;
 
-            bool drawing = player.IsRidingSnow && player.IsGrounded && player.Speed >= minSpeed;
+            bool drawing = player.IsRidingSnow && player.OnSnow && player.Speed >= minSpeed;
             if (!drawing)
             {
                 _hasLast = false;

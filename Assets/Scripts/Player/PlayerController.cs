@@ -1,4 +1,5 @@
 using UnityEngine;
+using SnowBound.Core;
 using SnowBound.Buildings;
 
 namespace SnowBound.Player
@@ -21,6 +22,10 @@ namespace SnowBound.Player
         public LayerMask groundMask = ~0;
         [Tooltip("The terrain mesh is faceted, so raw hit normals step from one\ntriangle to the next. Smoothing them keeps the ride steady.")]
         public float groundNormalSmoothing = 14f;
+
+        [Header("Gear")]
+        [Tooltip("Off by default so gear can only be changed at the lodge, which\nis what makes the loop a loop. Tick it to test freely.")]
+        public bool allowGearKeysAnywhere = false;
 
         [Header("Start")]
         public LocomotionKind startMode = LocomotionKind.Walk;
@@ -49,9 +54,18 @@ namespace SnowBound.Player
         public float LateralSlip;
 
         public bool IsGrounded { get; private set; }
+
+        /// <summary>
+        /// True only when the surface underfoot is marked SnowSurface.
+        /// Spray and tracks check this, so neither happens on the lodge deck.
+        /// </summary>
+        public bool OnSnow { get; private set; }
         public Vector3 GroundNormal { get; private set; } = Vector3.up;
         public float GroundSlopeDegrees { get; private set; }
         public LocomotionKind CurrentKind => _active != null ? _active.Kind : startMode;
+
+        /// <summary>True while sitting on a chairlift. Input and physics are off.</summary>
+        public bool IsRiding { get; private set; }
 
         /// <summary>True on skis or a board, as opposed to on foot.</summary>
         public bool IsRidingSnow =>
@@ -82,6 +96,10 @@ namespace SnowBound.Player
 
         Transform _camera;
         PlayerVisual _visual;
+        Collider _groundCollider;
+        bool _groundIsSnow;
+        Transform _seat;
+        Vector3 _seatOffset;
         LocomotionMode _active;
         readonly RaycastHit[] _hits = new RaycastHit[8];
 
@@ -105,12 +123,22 @@ namespace SnowBound.Player
 
         void Update()
         {
+            if (IsRiding)
+            {
+                if (_seat != null)
+                    transform.SetPositionAndRotation(_seat.TransformPoint(_seatOffset), _seat.rotation);
+                return;
+            }
+
             float dt = Time.deltaTime;
 
             ProbeGround();
 
-            int gear = Input.GearPressed;
-            if (gear > 0) SetMode((LocomotionKind)gear);
+            if (allowGearKeysAnywhere)
+            {
+                int gear = Input.GearPressed;
+                if (gear > 0) SetMode((LocomotionKind)gear);
+            }
 
             if (_active != null) _active.Tick(dt);
 
@@ -131,6 +159,7 @@ namespace SnowBound.Player
             bool wasGrounded = IsGrounded;
             IsGrounded = false;
             Vector3 raw = Vector3.up;
+            Collider surface = null;
             float nearest = float.MaxValue;
 
             for (int i = 0; i < n; i++)
@@ -150,8 +179,17 @@ namespace SnowBound.Player
                     nearest = h.distance;
                     IsGrounded = true;
                     raw = h.normal;
+                    surface = h.collider;
                 }
             }
+
+            // Only look the marker up when the surface actually changes.
+            if (surface != _groundCollider)
+            {
+                _groundCollider = surface;
+                _groundIsSnow = surface != null && surface.GetComponent<SnowSurface>() != null;
+            }
+            OnSnow = IsGrounded && _groundIsSnow;
 
             if (!IsGrounded) GroundNormal = Vector3.up;
             else if (!wasGrounded) GroundNormal = raw;   // land on the real slope at once
@@ -206,6 +244,61 @@ namespace SnowBound.Player
             transform.position = position;
             Body.enabled = true;
             Velocity = Vector3.zero;
+        }
+
+        // ---------------- riding a lift ---------------------------------
+
+        /// <summary>
+        /// Hand control to a chairlift seat. Physics and input stop; the body
+        /// simply follows the seat until the lift lets go.
+        /// </summary>
+        public void AttachTo(Transform seat, Vector3 localOffset)
+        {
+            if (seat == null) return;
+
+            IsRiding = true;
+            _seat = seat;
+            _seatOffset = localOffset;
+
+            Velocity = Vector3.zero;
+            GroundStick = Vector3.zero;
+            LateralSlip = 0f;
+            IsGrounded = false;
+            OnSnow = false;
+
+            Body.enabled = false;
+            Input.enableInput = false;
+            if (_visual != null) _visual.SetSeated(true);
+        }
+
+        /// <summary>Step off the lift, facing <paramref name="facing"/>, already moving.</summary>
+        public void Detach(Vector3 position, Vector3 facing, Vector3 velocity, LocomotionKind kind)
+        {
+            IsRiding = false;
+            _seat = null;
+
+            if (_visual != null) _visual.SetSeated(false);
+            Input.enableInput = true;
+
+            Body.enabled = false;
+            transform.position = position;
+            if (facing.sqrMagnitude > 0.0001f)
+                transform.rotation = Quaternion.LookRotation(facing.normalized, Vector3.up);
+            Body.enabled = true;
+
+            Velocity = velocity;
+            SetMode(kind);
+
+            // SetMode is a no-op when the gear has not changed, so re-enter
+            // deliberately: the mode has to pick up the new heading.
+            ReEnterMode();
+        }
+
+        void ReEnterMode()
+        {
+            if (_active == null) return;
+            _active.OnExit();
+            _active.OnEnter();
         }
 
         public void SpawnAtLodge()

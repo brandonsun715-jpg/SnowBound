@@ -24,11 +24,13 @@ namespace SnowBound.Player
         Transform _body;
         Transform _skis;
         Transform _board;
+        readonly Transform[] _legs = new Transform[2];
 
         // Remembered so the state survives a rebuild, whatever order the
         // player's components happen to start in.
         LocomotionKind _shownGear = LocomotionKind.Walk;
         float _bodyYaw;
+        bool _seated;
 
         void Start() { Build(); }
 
@@ -68,6 +70,7 @@ namespace SnowBound.Player
 
             ShowGear(_shownGear);
             SetBodyYawOffset(_bodyYaw);
+            SetSeated(_seated);
 
             foreach (Transform tr in root.GetComponentsInChildren<Transform>(true))
                 tr.gameObject.hideFlags = HideFlags.DontSaveInEditor;
@@ -82,9 +85,9 @@ namespace SnowBound.Player
 
             for (int side = -1; side <= 1; side += 2)
             {
-                Part(_body, PrimitiveType.Capsule, "Leg",
+                _legs[(side + 1) / 2] = Part(_body, PrimitiveType.Capsule, "Leg",
                      new Vector3(side * 0.13f, 0.44f, 0f),
-                     new Vector3(0.26f, 0.42f, 0.26f), trouserMat);
+                     new Vector3(0.26f, 0.42f, 0.26f), trouserMat).transform;
 
                 Part(_body, PrimitiveType.Capsule, "Arm",
                      new Vector3(side * 0.34f, 1.20f, 0f),
@@ -150,7 +153,26 @@ namespace SnowBound.Player
             if (_body != null) _body.localRotation = Quaternion.Euler(0f, degrees, 0f);
         }
 
-        void Part(Transform parent, PrimitiveType shape, string name,
+        /// <summary>Sit the rider down for the chairlift, or stand them back up.</summary>
+        public void SetSeated(bool seated)
+        {
+            _seated = seated;
+
+            if (_body != null)
+                _body.localPosition = seated ? new Vector3(0f, -0.30f, 0.04f) : Vector3.zero;
+
+            for (int i = 0; i < _legs.Length; i++)
+            {
+                if (_legs[i] == null) continue;
+                float side = i == 0 ? -1f : 1f;
+                _legs[i].localPosition = seated
+                    ? new Vector3(side * 0.13f, 0.52f, 0.18f)
+                    : new Vector3(side * 0.13f, 0.44f, 0f);
+                _legs[i].localRotation = seated ? Quaternion.Euler(-68f, 0f, 0f) : Quaternion.identity;
+            }
+        }
+
+        GameObject Part(Transform parent, PrimitiveType shape, string name,
                   Vector3 localPosition, Vector3 localScale, Material mat)
         {
             var go = GameObject.CreatePrimitive(shape);
@@ -162,6 +184,8 @@ namespace SnowBound.Player
 
             // The CharacterController capsule is the only collider the player needs.
             Kill(go.GetComponent<Collider>());
+
+            return go;
         }
     }
 }

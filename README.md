@@ -25,6 +25,9 @@ Assets/
     Core/                 shared helpers (procedural meshes, materials)
     Editor/               editor-only tools (scene builder menu)
     Buildings/            resort buildings (lodge today, more with the tycoon)
+    Lifts/                chairlift path, chairs and operation
+    Game/                 loop rules: gear rack, run timing
+    UI/                   heads-up display
     Player/               character, locomotion modes, input, camera
     Mountain/             terrain generation and scene dressing
     Lifts/                chairlift
@@ -42,8 +45,12 @@ Assets/
 3. **Player** — walking, gravity, jumping, third-person camera. *(done)*
 4. **Skiing and snowboarding** — momentum, edges, carving, braking. *(done)*
 5. **Snow spray and tracks** — particle plume and ribbons in the snow. *(done)*
-6. Chairlift.
-7. Loop glue: gear swap at the lodge, start/finish areas.
+6. **Chairlift** — two terminals, towers, a moving cable loop, boarding and
+   unloading. *(done)*
+7. **Loop glue** — gear rack at the lodge, start and finish gates, run timer,
+   HUD. *(done)*
+
+Milestone 1 is complete. Next passes are polish and depth, not new scaffolding.
 
 ## Building the scene
 
@@ -81,8 +88,21 @@ props after changing generator settings.
 |---|---|
 | Mouse | Turn the camera |
 | Scroll wheel | Zoom in / out |
-| `1` / `2` / `3` | Walk / ski / snowboard |
+| `1` / `2` / `3` | Walk / ski / snowboard, **at the lodge gear rack only** |
 | `Esc` | Release the mouse cursor (in the editor) |
+
+## The loop
+
+`Lodge → gear rack → skate to the chairlift → board → ride to the summit →
+step off → ski or snowboard down → through the finish gate → back to the lodge`
+
+Gear can only be changed at the rack outside the lodge. That single rule is
+what makes the systems a loop rather than a sandbox. Tick
+`PlayerController.allowGearKeysAnywhere` to ignore it while testing.
+
+Boarding is automatic: stand in the loading area and the next free chair
+picks you up, and the lift sets you down at the top. A prototype should not
+fail because of a mistimed button press.
 
 ## Notes
 
@@ -92,6 +112,13 @@ props after changing generator settings.
   body, gravity and the ground probe; a `LocomotionMode` component decides
   only how velocity and facing change. Skiing and snowboarding drop into the
   same slot, so they can feel nothing like walking.
+- `SnowSurface` marks a collider as carveable snow. Spray and tracks check it,
+  which is why neither happens on the lodge deck, a lift tower or a rock.
+- The chairlift lays its own line out by asking the mountain where the piste
+  is, so it always runs just inside the right-hand edge however the terrain is
+  retuned. Chairs are positioned by one number, how far round the loop they
+  are, which makes "has a chair reached the loading point?" a one-line
+  question instead of a geometry problem.
 - Snow riding is not walking with a bigger number. The rider has a heading
   (where the edges point) and a velocity (where they are actually going), and
   those are allowed to disagree. Gravity pulls along the slope, the edges

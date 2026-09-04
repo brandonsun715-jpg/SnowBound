@@ -103,7 +103,7 @@ namespace SnowBound.Player
 
             var emission = _system.emission;
 
-            bool riding = player.IsRidingSnow && player.IsGrounded;
+            bool riding = player.IsRidingSnow && player.OnSnow;
             if (!riding)
             {
                 emission.rateOverTime = 0f;
