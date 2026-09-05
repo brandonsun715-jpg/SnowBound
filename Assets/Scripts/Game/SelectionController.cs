@@ -8,14 +8,15 @@ using SnowBound.Hud;
 
 namespace SnowBound.Game
 {
-    public enum SelectionKind { None, Facility, Trail, Guest }
+    public enum SelectionKind { None, Facility, Trail, Guest, Ground }
 
     /// <summary>What the player has clicked on. Plain data, read by the inspector.</summary>
     public class Selection
     {
         public SelectionKind kind = SelectionKind.None;
         public Facility facility;
-        public int pisteIndex = -1;
+        public int trailIndex = -1;
+        public Trail trail;
         public Guest guest;
         public Vector3 anchor;
         public float radius = 12f;
@@ -139,18 +140,32 @@ namespace SnowBound.Game
                 return;
             }
 
-            // Anything else on the mountain is a question about the run it sits on.
+            // Anything else is the mountain itself: either a run, or open ground.
             if (mountain == null) { Clear(); return; }
 
-            int piste = mountain.NearestPiste(hit.point.x, hit.point.z);
-            Vector3 centre = mountain.PistePoint(piste, Mathf.Clamp(hit.point.z, 20f, mountain.length - 20f));
+            Trail trail = mountain.TrailUnder(hit.point.x, hit.point.z, 6f);
+
+            if (trail == null)
+            {
+                Set(new Selection
+                {
+                    kind = SelectionKind.Ground,
+                    anchor = hit.point,
+                    radius = 9f
+                });
+                return;
+            }
+
+            float along;
+            trail.DistanceTo(hit.point.x, hit.point.z, out along);
 
             Set(new Selection
             {
                 kind = SelectionKind.Trail,
-                pisteIndex = piste,
-                anchor = centre,
-                radius = Mathf.Max(10f, mountain.PisteHalfWidth(piste, centre.z) * 0.8f)
+                trailIndex = mountain.IndexOf(trail),
+                trail = trail,
+                anchor = trail.PointAt(along),
+                radius = Mathf.Max(10f, trail.halfWidth * 0.9f)
             });
         }
 
@@ -163,8 +178,7 @@ namespace SnowBound.Game
             if (lodge != null) return lodge.EntrancePosition;
 
             var park = facility.GetComponent<TerrainPark>();
-            if (park != null && mountain != null)
-                return mountain.PistePoint(park.pisteIndex, park.topKickerZ);
+            if (park != null && mountain != null) return park.Anchor;
 
             return fallback;
         }

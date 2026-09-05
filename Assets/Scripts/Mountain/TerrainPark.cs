@@ -22,9 +22,13 @@ namespace SnowBound.Mountain
 
         [Header("Where")]
         [Tooltip("Which run the park is built on.")]
-        public int pisteIndex = 0;
+        public int trailIndex = 0;
         [Tooltip("Metres to one side of that run's centre line.")]
         public float lateralOffset = 13f;
+        [Tooltip("Off until the resort actually has a park. A new resort has none.")]
+        public bool built = false;
+        [Tooltip("How far down the run the top kicker sits, 0 summit, 1 base.")]
+        [Range(0.1f, 0.9f)] public float alongTrail = 0.45f;
 
         [Header("Kickers")]
         public int kickerCount = 3;
@@ -75,6 +79,12 @@ namespace SnowBound.Mountain
 
             Clear();
 
+            // A park is built on a run. Without one there is nowhere to put it,
+            // and on a new resort there is no run yet.
+            if (!built || Run == null) return;
+
+            PlaceOnRun();
+
             var root = new GameObject(ContainerName);
             root.transform.SetParent(transform, false);
 
@@ -90,9 +100,58 @@ namespace SnowBound.Mountain
                 tr.gameObject.hideFlags = HideFlags.DontSaveInEditor;
         }
 
+        public Trail Run
+        {
+            get { return mountain != null ? mountain.TrailAt(trailIndex) : null; }
+        }
+
+        /// <summary>Where along its run the park ended up. The map marker uses this.</summary>
+        public Vector3 Anchor
+        {
+            get
+            {
+                Trail run = Run;
+                return run != null ? run.PointAt(alongTrail) : transform.position;
+            }
+        }
+
+        /// <summary>
+        /// Lay the park out along whichever run it belongs to, rather than at
+        /// fixed distances up the mountain. A run the player drew can start
+        /// and finish anywhere.
+        /// </summary>
+        void PlaceOnRun()
+        {
+            Trail run = Run;
+            if (run == null) return;
+
+            topKickerZ = run.PointAt(alongTrail).z;
+            boxZ = run.PointAt(Mathf.Max(0.05f, alongTrail - 0.14f)).z;
+        }
+
+        /// <summary>
+        /// Middle of the run at this distance up the mountain. A run is a line
+        /// the player drew, so this reads the line rather than assuming the
+        /// run goes straight down.
+        /// </summary>
         float CentreX(float z)
         {
-            return mountain.PisteCenterX(pisteIndex, z) + lateralOffset;
+            Trail run = Run;
+            if (run == null || run.spine == null || run.spine.Count == 0) return lateralOffset;
+
+            float best = float.MaxValue;
+            float x = 0f;
+
+            for (int i = 0; i < run.spine.Count; i++)
+            {
+                float d = Mathf.Abs(run.spine[i].z - z);
+                if (d >= best) continue;
+
+                best = d;
+                x = run.spine[i].x;
+            }
+
+            return x + lateralOffset;
         }
 
         // ---------------- kickers -----------------------------------------

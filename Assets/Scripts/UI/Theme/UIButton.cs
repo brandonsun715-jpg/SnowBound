@@ -15,12 +15,17 @@ namespace SnowBound.Hud
         public Text label;
         public bool interactable = true;
 
+        /// <summary>Label colour while enabled. Set it to flag a price you cannot pay.</summary>
+        [System.NonSerialized] public Color labelColour = UITheme.Ink;
+
         public event System.Action Clicked;
 
         public bool Hovered { get; private set; }
 
         RectTransform _rect;
         Color _restColour;
+        CanvasGroup _group;
+        bool _groupChecked;
 
         void Awake()
         {
@@ -39,8 +44,13 @@ namespace SnowBound.Hud
             if (background == null || _rect == null) return;
 
             // A panel mid-fade is still in the hierarchy. It must not accept clicks.
-            var group = GetComponentInParent<CanvasGroup>();
-            bool reachable = group == null || group.alpha > 0.9f;
+            if (!_groupChecked)
+            {
+                _group = GetComponentInParent<CanvasGroup>();
+                _groupChecked = true;
+            }
+
+            bool reachable = _group == null || _group.alpha > 0.9f;
 
             Hovered = interactable && reachable && UIPointer.Over(_rect);
 
@@ -62,7 +72,7 @@ namespace SnowBound.Hud
             if (border != null) border.color = Color.Lerp(border.color, edge, 1f - Mathf.Exp(-14f * dt));
 
             if (label != null)
-                label.color = Color.Lerp(label.color, interactable ? UITheme.Ink : UITheme.InkFaint,
+                label.color = Color.Lerp(label.color, interactable ? labelColour : UITheme.InkFaint,
                                          1f - Mathf.Exp(-14f * dt));
 
             if (Hovered && UIPointer.Pressed && Clicked != null) Clicked();

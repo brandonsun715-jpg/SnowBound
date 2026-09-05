@@ -25,6 +25,8 @@ namespace SnowBound.Resort
             get { return Kickers + " kickers  ·  boxes"; }
         }
 
+        public override bool Operating { get { return park != null && park.built; } }
+
         public override void ApplyLevel()
         {
             if (park == null) park = FindAnyObjectByType<TerrainPark>();

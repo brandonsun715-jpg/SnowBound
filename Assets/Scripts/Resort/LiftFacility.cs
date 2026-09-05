@@ -4,50 +4,83 @@ using SnowBound.Lifts;
 namespace SnowBound.Resort
 {
     /// <summary>
-    /// The chairlift as a business: it costs money to run, its level decides
-    /// how fast it moves and how close together the chairs are, and both of
-    /// those are things a guest waiting at the bottom can feel.
+    /// A lift as a business: it costs money to run, its level decides how fast
+    /// it moves, how close together the carriers are and how many each holds,
+    /// and all three are things a guest waiting at the bottom can feel.
+    ///
+    /// What sort of lift it is comes from the catalogue entry it was bought
+    /// from, so this does not need to know what a gondola is.
     /// </summary>
     public class LiftFacility : Facility
     {
         public Chairlift lift;
+        public LiftKind kind = LiftKind.Chair;
 
-        [Header("By level")]
-        public float[] lineSpeeds = { 7f, 9.5f, 12f };
-        public float[] chairSpacings = { 32f, 26f, 20f };
-        public int[] seatsPerChair = { 4, 6, 8 };
+        LiftDefinition _definition;
 
-        public int Seats { get { return Pick(seatsPerChair, 4); } }
-        public float LineSpeed { get { return Pick(lineSpeeds, 9f); } }
+        public LiftDefinition Definition
+        {
+            get
+            {
+                if (_definition == null || _definition.kind != kind) _definition = LiftCatalogue.Find(kind);
+                return _definition;
+            }
+        }
+
+        public int Seats { get { return Definition.seats + (level - 1); } }
+        public float LineSpeed { get { return Definition.lineSpeed * (1f + 0.18f * (level - 1)); } }
+        public float Spacing { get { return Definition.carrierSpacing * (1f - 0.12f * (level - 1)); } }
+
+        /// <summary>The figure that matters: people this lift moves per hour.</summary>
+        public int GuestsPerHour
+        {
+            get { return Mathf.RoundToInt(LineSpeed * 3600f / Mathf.Max(1f, Spacing) * Seats); }
+        }
 
         public override string LevelSummary
         {
             get
             {
-                return "Capacity " + Seats + " per chair  ·  " +
-                       Mathf.RoundToInt(LineSpeed * 3.6f) + " km/h";
+                return GuestsPerHour.ToString("N0") + " guests / hour  ·  "
+                     + Mathf.RoundToInt(LineSpeed * 3.6f) + " km/h";
             }
+        }
+
+        /// <summary>Set this facility up around a lift that was just bought.</summary>
+        public void Adopt(Chairlift rig, LiftDefinition definition)
+        {
+            lift = rig;
+            kind = definition.kind;
+            _definition = definition;
+
+            displayName = definition.name;
+            baseDailyUpkeep = definition.dailyUpkeep;
+            upkeepPerLevel = definition.dailyUpkeep * 0.55f;
+            baseQuality = definition.quality;
+            qualityPerLevel = 0.14f;
+            baseUpgradeCost = definition.cost * 0.6f;
+            upgradeCostPerLevel = definition.cost * 0.75f;
+            maxLevel = 3;
+
+            ApplyLevel();
         }
 
         public override void ApplyLevel()
         {
-            if (lift == null) lift = Chairlift.Instance;
+            if (lift == null) lift = GetComponent<Chairlift>();
             if (lift == null) return;
 
-            float spacing = Pick(chairSpacings, 26f);
-            bool needsRebuild = !Mathf.Approximately(lift.chairSpacing, spacing);
+            float spacing = Spacing;
+            int seats = Seats;
+
+            bool needsRebuild = !Mathf.Approximately(lift.chairSpacing, spacing) || lift.seats != seats;
 
             lift.lineSpeed = LineSpeed;
             lift.chairSpacing = spacing;
+            lift.seats = seats;
 
-            // Speed is live, but the number of chairs on the cable is not.
+            // Speed is live, but how many carriers are on the rope is not.
             if (needsRebuild && Application.isPlaying) lift.Build();
-        }
-
-        T Pick<T>(T[] table, T fallback)
-        {
-            if (table == null || table.Length == 0) return fallback;
-            return table[Mathf.Clamp(level - 1, 0, table.Length - 1)];
         }
     }
 }

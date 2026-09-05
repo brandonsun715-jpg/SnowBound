@@ -57,6 +57,7 @@ namespace SnowBound.Resort
         LodgeFacility _lodge;
         ParkFacility _park;
         ResortRating _ratingSource;
+        SnowBound.Lifts.Chairlift _anyLift;
         float _pendingArrivals;
         float _lastChargedHour;
         int _countedDay;
@@ -71,7 +72,7 @@ namespace SnowBound.Resort
                 for (int i = 0; i < _facilities.Length; i++)
                 {
                     Facility facility = _facilities[i];
-                    if (facility == null) continue;
+                    if (facility == null || !facility.Operating) continue;
 
                     // A building still being positioned has not been paid for
                     // and does not cost anything to run yet.
@@ -106,6 +107,7 @@ namespace SnowBound.Resort
             _facilities = FindObjectsByType<Facility>(FindObjectsSortMode.None);
             _lodge = FindAnyObjectByType<LodgeFacility>();
             _park = FindAnyObjectByType<ParkFacility>();
+            _anyLift = FindAnyObjectByType<SnowBound.Lifts.Chairlift>();
         }
 
         void Update()
@@ -147,13 +149,37 @@ namespace SnowBound.Resort
             ledger.Charge(LedgerLine.Maintenance, DailyUpkeep / openHours * hours);
         }
 
+        /// <summary>
+        /// Nobody comes skiing at a resort with nothing to ski or no way up.
+        /// A lodge on a bare mountain is a building, not a business, which is
+        /// the whole reason a new resort has to be built before it earns.
+        /// </summary>
+        float Operable()
+        {
+            var mountain = SnowBound.Mountain.MountainGenerator.Instance;
+            if (mountain == null) return 0f;
+
+            bool open = false;
+            for (int i = 0; i < mountain.TrailCount; i++)
+            {
+                SnowBound.Mountain.Trail run = mountain.TrailAt(i);
+                if (run != null && run.open) { open = true; break; }
+            }
+
+            if (!open) return 0f;
+            if (_anyLift == null) return 0f;
+
+            return 1f;
+        }
+
         void AdmitGuests(float dt)
         {
             float storm = weather != null ? weather.storminess : 0f;
 
             DemandToday = guestsPerDay
                         * Mathf.Lerp(demandAtWorstRating, demandAtBestRating, Mathf.Clamp01(rating / 5f))
-                        * Mathf.Lerp(demandWhenClear, demandInStorm, storm);
+                        * Mathf.Lerp(demandWhenClear, demandInStorm, storm)
+                        * Operable();
 
             // A half sine across opening hours: quiet at the doors, busy at
             // midday, tailing off by the last lift.

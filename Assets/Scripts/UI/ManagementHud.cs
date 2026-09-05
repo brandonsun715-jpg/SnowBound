@@ -2,51 +2,54 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using SnowBound.Game;
+using SnowBound.Mountain;
 using SnowBound.Resort;
 
 namespace SnowBound.Hud
 {
     /// <summary>
-    /// The owner's interface: a bar of figures across the top, categories
-    /// along the bottom, and the mountain filling everything in between.
+    /// The owner's interface: one strip of figures across the top, a small
+    /// chip underneath saying where and when you are, and nothing else. The
+    /// tools live in the dock along the bottom and the details live in the
+    /// rail on the right, so the middle of the screen — the mountain, which is
+    /// the thing being decided about — is never covered.
     ///
-    /// It is a layer over the resort, not a window instead of it, so the
-    /// centre of the screen stays empty and the world keeps running behind
-    /// every panel.
+    /// Every piece is anchored to the edge it belongs to and sized against the
+    /// narrowest window worth supporting, so the bar cannot run off the side
+    /// of a square window or drift apart on an ultrawide one.
     /// </summary>
     public class ManagementHud : MonoBehaviour
     {
         public ModeDirector modes;
         public ManagementScreen overview;
-        public BuildPanel build;
+        public ToolDock dock;
         public Ledger ledger;
         public ResortClock clock;
         public ResortTraffic traffic;
         public ResortRating rating;
         public GuestDirector guests;
         public ResortIdentity identity;
+        public MountainGenerator mountain;
 
         Canvas _canvas;
         UIPanel _panel;
 
-        Text _cash, _guestCount, _ratingValue, _happiness, _profit, _clockText;
+        Text _cash, _guestCount, _ratingValue, _happiness, _profit;
+        Text _place, _clockText, _state;
         UIStars _stars;
-        Text _note;
-        UIButton _enter;
-
-        readonly List<UIButton> _categories = new List<UIButton>();
 
         void Start()
         {
             if (modes == null) modes = ModeDirector.Instance;
             if (overview == null) overview = FindAnyObjectByType<ManagementScreen>();
-            if (build == null) build = FindAnyObjectByType<BuildPanel>();
+            if (dock == null) dock = FindAnyObjectByType<ToolDock>();
             if (ledger == null) ledger = Ledger.Instance;
             if (clock == null) clock = ResortClock.Instance;
             if (traffic == null) traffic = FindAnyObjectByType<ResortTraffic>();
             if (rating == null) rating = ResortRating.Instance;
             if (guests == null) guests = GuestDirector.Instance;
             if (identity == null) identity = ResortIdentity.Instance;
+            if (mountain == null) mountain = MountainGenerator.Instance;
 
             Build();
             _panel.HideInstantly();
@@ -62,7 +65,7 @@ namespace SnowBound.Hud
 
         void Build()
         {
-            _canvas = UIBuilder.Canvas(transform, "ManagementHud", 8);
+            _canvas = UIBuilder.Canvas(transform, "ManagementHud", 11);
 
             RectTransform layer = UIBuilder.Stretch(UIBuilder.Node(_canvas.transform, "Layer"));
             layer.gameObject.AddComponent<CanvasGroup>();
@@ -70,219 +73,127 @@ namespace SnowBound.Hud
             _panel.riseDistance = 10f;
 
             BuildTopBar(layer);
-            BuildModeChip(layer);
-            BuildCategories(layer);
-            BuildEnterButton(layer);
+            BuildPlaceChip(layer);
         }
 
         void BuildTopBar(Transform layer)
         {
-            RectTransform bar = UIBuilder.Glass(layer, "TopBar", new Vector2(0.5f, 1f),
-                                                new Vector2(0.5f, 1f),
-                                                new Vector2(0f, -22f),
-                                                new Vector2(1240f, 96f));
+            RectTransform bar = UIBuilder.Glass(layer, "TopBar",
+                                                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+                                                new Vector2(0f, -UILayout.Margin),
+                                                new Vector2(UILayout.SafeWidth, UILayout.TopBarHeight));
             UIPointer.Block(bar);
 
-            _cash = Stat(bar, "Cash", UIIcons.Cash, "CASH", -480f);
-            _guestCount = Stat(bar, "Guests", UIIcons.Guests, "GUESTS TODAY", -240f);
-            _happiness = Stat(bar, "Happiness", UIIcons.Lodge, "HAPPINESS", 0f);
-            _ratingValue = Stat(bar, "Rating", UIIcons.Star, "RATING", 240f);
-            _profit = Stat(bar, "Profit", UIIcons.ArrowUp, "PROFIT TODAY", 480f);
+            const float stride = 138f;
+            float x = UITheme.Pad;
 
-            _stars = UIStars.Create(bar, "Stars", new Vector2(0.5f, 1f), new Vector2(0f, 1f),
-                                    new Vector2(240f - 56f, -72f), 12f, 3f);
+            _cash = Figure(bar, "Cash", "CASH", x, UIIcons.Cash);
+            _guestCount = Figure(bar, "Guests", "GUESTS", x + stride, UIIcons.Guests);
+            _happiness = Figure(bar, "Happiness", "HAPPINESS", x + stride * 2f, UIIcons.Star);
+            _ratingValue = Figure(bar, "Rating", "REPUTATION", x + stride * 3f, UIIcons.Mountain);
+            _profit = Figure(bar, "Profit", "TODAY", x + stride * 4f, UIIcons.ArrowUp);
 
-            _clockText = UIBuilder.Label(bar, "Clock", UITheme.Micro, UITheme.InkFaint,
-                                         TextAnchor.LowerCenter);
-            UIBuilder.Place(_clockText.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 1f),
-                            new Vector2(0f, -6f), new Vector2(400f, 20f));
+            _stars = UIStars.Create(bar, "Stars", new Vector2(0f, 0f), new Vector2(0f, 0f),
+                                    new Vector2(x + stride * 3f, 12f), 9f, 3f);
+
+            // The two buttons hug the right edge, so the figures grow leftwards
+            // into empty space instead of running underneath them.
+            UIButton enter = Chip(bar, "ENTER MOUNTAIN", -UITheme.Pad, 168f);
+            enter.SetRestColour(UITheme.CardHover);
+            enter.Clicked += () => { if (modes != null) modes.EnterMountain(); };
+
+            UIButton resort = Chip(bar, "RESORT", -UITheme.Pad - 176f, 150f);
+            resort.Clicked += Overview;
         }
 
-        Text Stat(Transform bar, string name, Sprite icon, string caption, float x)
+        void BuildPlaceChip(Transform layer)
         {
-            UIBuilder.Icon(bar, name + "Icon", icon, UITheme.InkFaint,
-                           new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                           new Vector2(x - 56f, -24f), 16f);
+            RectTransform chip = UIBuilder.Glass(layer, "PlaceChip",
+                                                 new Vector2(0f, 1f), new Vector2(0f, 1f),
+                                                 new Vector2(UILayout.Margin, -UILayout.UnderTopBar),
+                                                 new Vector2(270f, 62f), UITheme.RadiusSmall);
+
+            _place = UIBuilder.Label(chip, "Place", UITheme.Label, UITheme.Ink,
+                                     TextAnchor.UpperLeft, FontStyle.Bold);
+            UIBuilder.Place(_place.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f),
+                            new Vector2(14f, -10f), new Vector2(240f, 20f));
+
+            _clockText = UIBuilder.Label(chip, "Clock", UITheme.Micro, UITheme.InkMuted,
+                                         TextAnchor.UpperLeft);
+            UIBuilder.Place(_clockText.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f),
+                            new Vector2(14f, -32f), new Vector2(240f, 18f));
+
+            _state = UIBuilder.Label(chip, "State", UITheme.Micro, UITheme.Ice,
+                                     TextAnchor.LowerLeft);
+            UIBuilder.Place(_state.rectTransform, new Vector2(0f, 0f), new Vector2(0f, 0f),
+                            new Vector2(14f, 8f), new Vector2(240f, 16f));
+        }
+
+        void Overview()
+        {
+            if (overview == null) return;
+
+            if (dock != null) dock.Close();
+
+            if (overview.IsOpen) overview.Close();
+            else overview.Open();
+        }
+
+        /// <summary>One figure in the top bar: a caption, an icon and a number.</summary>
+        Text Figure(Transform bar, string name, string caption, float x, Sprite icon)
+        {
+            var topLeft = new Vector2(0f, 1f);
 
             Text label = UIBuilder.Label(bar, name + "Caption", UITheme.Micro, UITheme.InkFaint,
                                          TextAnchor.UpperLeft);
-            UIBuilder.Place(label.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, 1f),
-                            new Vector2(x - 44f, -18f), new Vector2(220f, 18f));
+            UIBuilder.Place(label.rectTransform, topLeft, topLeft,
+                            new Vector2(x, -12f), new Vector2(130f, 16f));
             label.text = UITheme.Track(caption);
 
-            Text value = UIBuilder.Label(bar, name + "Value", UITheme.Title, UITheme.Ink,
+            UIBuilder.Icon(bar, name + "Icon", icon, UITheme.Ice, topLeft, topLeft,
+                           new Vector2(x, -34f), 15f);
+
+            Text value = UIBuilder.Label(bar, name, UITheme.Heading, UITheme.Ink,
                                          TextAnchor.UpperLeft, FontStyle.Bold);
-            UIBuilder.Place(value.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, 1f),
-                            new Vector2(x - 56f, -40f), new Vector2(230f, 40f));
+            UIBuilder.Place(value.rectTransform, topLeft, topLeft,
+                            new Vector2(x + 22f, -32f), new Vector2(112f, 26f));
 
             return value;
         }
 
-        void BuildModeChip(Transform layer)
+        UIButton Chip(Transform bar, string text, float x, float width)
         {
-            RectTransform chip = UIBuilder.Glass(layer, "ModeChip", new Vector2(0f, 1f),
-                                                 new Vector2(0f, 1f),
-                                                 new Vector2(UITheme.Margin, -UITheme.Margin),
-                                                 new Vector2(230f, 40f), UITheme.RadiusSmall);
+            RectTransform rect = UIBuilder.Place(UIBuilder.Node(bar, text),
+                                                 new Vector2(1f, 0.5f), new Vector2(1f, 0.5f),
+                                                 new Vector2(x, 0f), new Vector2(width, 44f));
 
-            Text label = UIBuilder.Label(chip, "Label", UITheme.Micro, UITheme.Ice,
-                                         TextAnchor.MiddleCenter);
-            UIBuilder.Stretch(label.rectTransform);
-            label.text = UITheme.Track("MANAGEMENT MODE", 1);
-        }
-
-        void BuildCategories(Transform layer)
-        {
-            string[] names = { "BUILD", "LIFTS", "TERRAIN", "FACILITIES", "UPGRADES", "MAP" };
-
-            RectTransform bar = UIBuilder.Glass(layer, "Categories", new Vector2(0f, 0f),
-                                                new Vector2(0f, 0f),
-                                                new Vector2(UITheme.Margin, UITheme.Margin),
-                                                new Vector2(names.Length * 132f + 16f, 74f));
-            UIPointer.Block(bar);
-
-            for (int i = 0; i < names.Length; i++)
-            {
-                string category = names[i];
-                UIButton button = Category(bar, category, 8f + i * 132f);
-                button.Clicked += () => Choose(category);
-                _categories.Add(button);
-            }
-
-            _note = UIBuilder.Label(layer, "Note", UITheme.Micro, UITheme.InkFaint,
-                                    TextAnchor.LowerLeft);
-            UIBuilder.Place(_note.rectTransform, new Vector2(0f, 0f), new Vector2(0f, 0f),
-                            new Vector2(UITheme.Margin + 8f, UITheme.Margin + 82f),
-                            new Vector2(700f, 20f));
-        }
-
-        UIButton Category(Transform bar, string name, float x)
-        {
-            RectTransform button = UIBuilder.Place(UIBuilder.Node(bar, name),
-                                                   new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
-                                                   new Vector2(x, 0f), new Vector2(124f, 56f));
-
-            var fill = button.gameObject.AddComponent<Image>();
+            var fill = rect.gameObject.AddComponent<Image>();
             fill.sprite = UISprites.Fill(UITheme.RadiusSmall);
             fill.type = Image.Type.Sliced;
             fill.color = UITheme.Card;
 
-            var border = UIBuilder.Stretch(UIBuilder.Node(button, "Hairline"))
+            var border = UIBuilder.Stretch(UIBuilder.Node(rect, "Hairline"))
                                   .gameObject.AddComponent<Image>();
             border.sprite = UISprites.Outline(UITheme.RadiusSmall, 1);
             border.type = Image.Type.Sliced;
             border.color = UITheme.Hairline;
             border.raycastTarget = false;
 
-            UIBuilder.Icon(button, "Icon", IconFor(name), UITheme.InkMuted,
-                           new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -10f), 18f);
+            Text label = UIBuilder.Label(rect, "Label", UITheme.Micro, UITheme.Ink,
+                                         TextAnchor.MiddleCenter, FontStyle.Bold);
+            UIBuilder.Stretch(label.rectTransform, 4f);
+            label.text = UITheme.Track(text);
 
-            Text label = UIBuilder.Label(button, "Label", UITheme.Micro, UITheme.InkMuted,
-                                         TextAnchor.LowerCenter);
-            UIBuilder.Place(label.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-                            new Vector2(0f, 8f), new Vector2(124f, 18f));
-            label.text = UITheme.Track(name);
+            var button = rect.gameObject.AddComponent<UIButton>();
+            button.background = fill;
+            button.border = border;
+            button.label = label;
+            button.SetRestColour(UITheme.Card);
 
-            var control = button.gameObject.AddComponent<UIButton>();
-            control.background = fill;
-            control.border = border;
-            control.label = label;
-            control.SetRestColour(UITheme.Card);
-
-            return control;
-        }
-
-        static Sprite IconFor(string category)
-        {
-            switch (category)
-            {
-                case "BUILD": return UIIcons.Lodge;
-                case "LIFTS": return UIIcons.Lift;
-                case "TERRAIN": return UIIcons.Mountain;
-                case "FACILITIES": return UIIcons.Lodge;
-                case "UPGRADES": return UIIcons.ArrowUp;
-                default: return UIIcons.Mountain;
-            }
-        }
-
-        void BuildEnterButton(Transform layer)
-        {
-            RectTransform button = UIBuilder.Place(UIBuilder.Node(layer, "EnterMountain"),
-                                                   new Vector2(1f, 0f), new Vector2(1f, 0f),
-                                                   new Vector2(-UITheme.Margin, UITheme.Margin),
-                                                   new Vector2(300f, 74f));
-            UIPointer.Block(button);
-
-            var fill = button.gameObject.AddComponent<Image>();
-            fill.sprite = UISprites.Fill(UITheme.Radius);
-            fill.type = Image.Type.Sliced;
-            fill.color = UITheme.CardHover;
-
-            var border = UIBuilder.Stretch(UIBuilder.Node(button, "Hairline"))
-                                  .gameObject.AddComponent<Image>();
-            border.sprite = UISprites.Outline(UITheme.Radius, 1);
-            border.type = Image.Type.Sliced;
-            border.color = UITheme.HairlineBright;
-            border.raycastTarget = false;
-
-            UIBuilder.Icon(button, "Icon", UIIcons.Mountain, UITheme.Ice,
-                           new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(22f, 0f), 24f);
-
-            Text label = UIBuilder.Label(button, "Label", UITheme.Label, UITheme.Ink,
-                                         TextAnchor.MiddleLeft, FontStyle.Bold);
-            UIBuilder.Place(label.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
-                            new Vector2(58f, 4f), new Vector2(230f, 22f));
-            label.text = UITheme.Track("ENTER MOUNTAIN");
-
-            Text hint = UIBuilder.Label(button, "Hint", UITheme.Micro, UITheme.InkFaint,
-                                        TextAnchor.MiddleLeft);
-            UIBuilder.Place(hint.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
-                            new Vector2(58f, -16f), new Vector2(230f, 18f));
-            hint.text = UITheme.Track("SKI YOUR OWN RESORT");
-
-            _enter = button.gameObject.AddComponent<UIButton>();
-            _enter.background = fill;
-            _enter.border = border;
-            _enter.label = label;
-            _enter.SetRestColour(UITheme.CardHover);
-            _enter.Clicked += () => { if (modes != null) modes.EnterMountain(); };
+            return button;
         }
 
         // ---------------- running ----------------------------------------------
-
-        /// <summary>
-        /// One screen at a time. Opening either of the two big panels closes
-        /// the other, so the mountain is never buried under both at once.
-        /// </summary>
-        void Choose(string category)
-        {
-            if (category == "BUILD" || category == "TERRAIN")
-            {
-                if (overview != null) overview.Close();
-                _note.text = string.Empty;
-
-                if (build == null) { _note.text = UITheme.Track("BUILD MENU IS MISSING"); return; }
-
-                if (build.IsOpen) build.Close(); else build.Open();
-                return;
-            }
-
-            if (category == "FACILITIES" || category == "UPGRADES" || category == "LIFTS")
-            {
-                if (build != null) build.Close();
-                _note.text = string.Empty;
-
-                if (overview == null) return;
-
-                if (overview.IsOpen) overview.Close(); else overview.Open();
-                return;
-            }
-
-            if (overview != null) overview.Close();
-            if (build != null) build.Close();
-
-            _note.text = UITheme.Track(category + " ARRIVES IN A LATER UPDATE");
-        }
 
         void Update()
         {
@@ -298,7 +209,6 @@ namespace SnowBound.Hud
             }
 
             if (traffic != null) _guestCount.text = traffic.GuestsToday.ToString();
-
             if (guests != null) _happiness.text = Mathf.RoundToInt(guests.Happiness * 100f) + "%";
 
             if (rating != null)
@@ -307,11 +217,39 @@ namespace SnowBound.Hud
                 _stars.Set(rating.Stars);
             }
 
+            if (identity != null) _place.text = identity.resortName.ToUpperInvariant();
+
             if (clock != null)
+                _clockText.text = UITheme.Track("DAY " + clock.Day + "     " + clock.TimeText);
+
+            _state.text = UITheme.Track(StateLine());
+        }
+
+        /// <summary>
+        /// What the resort still needs. On a bare mountain this is the whole
+        /// tutorial: it names the next thing worth doing and then gets out of
+        /// the way once there is nothing obvious left.
+        /// </summary>
+        float _liftCheckedAt = -1f;
+        bool _hasLift;
+
+        string StateLine()
+        {
+            if (mountain == null) return "MANAGEMENT MODE";
+
+            if (mountain.TrailCount == 0) return "NO RUNS YET  ·  CUT ONE";
+
+            // Searching the scene every frame for a lift would be silly; twice
+            // a second is far quicker than anyone can build one.
+            if (Time.time - _liftCheckedAt > 0.5f)
             {
-                string place = identity != null ? identity.resortName.ToUpperInvariant() : "SNOWBOUND";
-                _clockText.text = UITheme.Track(place + "     DAY " + clock.Day + "     " + clock.TimeText);
+                _liftCheckedAt = Time.time;
+                _hasLift = FindAnyObjectByType<SnowBound.Lifts.Chairlift>() != null;
             }
+
+            if (!_hasLift) return "NO LIFT YET  ·  BUY ONE";
+
+            return "MANAGEMENT MODE";
         }
     }
 }

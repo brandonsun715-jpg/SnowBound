@@ -20,7 +20,7 @@ namespace SnowBound.Game
 
         [Header("Zoom")]
         public float minZoom = 38f;
-        public float maxZoom = 520f;
+        public float maxZoom = 780f;
         public float zoomSpeed = 900f;
         public float startZoom = 320f;
 

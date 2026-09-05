@@ -50,6 +50,7 @@ namespace SnowBound.Resort
         LiftFacility _lift;
         LodgeFacility _lodge;
         ParkFacility _park;
+        TerrainPark _parkRig;
         GuestDirector _guests;
 
         void OnEnable() { _instance = this; }
@@ -75,6 +76,7 @@ namespace SnowBound.Resort
             _lift = FindAnyObjectByType<LiftFacility>();
             _lodge = FindAnyObjectByType<LodgeFacility>();
             _park = FindAnyObjectByType<ParkFacility>();
+            _parkRig = FindAnyObjectByType<TerrainPark>();
             _guests = GuestDirector.Instance;
 
             Measure();
@@ -105,13 +107,18 @@ namespace SnowBound.Resort
         {
             if (_factors.Count < 8) return;
 
-            _factors[0].value = _lift != null ? _lift.Quality : 0.2f;
+            // A resort starts with no lift and buys one later, so keep looking
+            // until there is one rather than deciding at startup that there
+            // never will be.
+            if (_lift == null && Time.frameCount % 30 == 0) _lift = FindAnyObjectByType<LiftFacility>();
+
+            _factors[0].value = _lift != null ? _lift.Quality : 0f;
             _factors[1].value = Trails();
             _factors[2].value = _guests != null ? _guests.Happiness : 0.7f;
             _factors[3].value = _lodge != null ? _lodge.Quality : 0.2f;
             _factors[4].value = Variety();
             _factors[5].value = Conditions();
-            _factors[6].value = _park != null ? _park.Quality : 0f;
+            _factors[6].value = _parkRig != null && _parkRig.built && _park != null ? _park.Quality : 0f;
             _factors[7].value = Amenities();
         }
 
@@ -143,9 +150,27 @@ namespace SnowBound.Resort
         {
             if (_mountain == null) return 0.3f;
 
-            // More runs is better, with diminishing returns after a handful.
-            float count = Mathf.Clamp01(_mountain.PisteCount / 5f);
-            float groomed = 0.55f + 0.45f * count;
+            if (_mountain.TrailCount == 0) return 0f;
+
+            // More runs is better, with diminishing returns after a handful,
+            // and how they are kept counts as much as how many there are.
+            float count = Mathf.Clamp01(_mountain.TrailCount / 5f);
+
+            float condition = 0f;
+            int open = 0;
+
+            for (int i = 0; i < _mountain.TrailCount; i++)
+            {
+                Trail run = _mountain.TrailAt(i);
+                if (run == null || !run.open) continue;
+
+                condition += run.Appeal;
+                open++;
+            }
+
+            if (open == 0) return 0f;
+
+            float groomed = (0.35f + 0.4f * count) + condition / open * 0.4f;
 
             // Fresh snow flatters a mountain; a whiteout does not.
             if (_weather != null) groomed *= Mathf.Lerp(1f, 1.12f, _weather.powder);
@@ -157,21 +182,28 @@ namespace SnowBound.Resort
         {
             if (_mountain == null) return 0.2f;
 
-            bool green = false, blue = false, black = false;
-            for (int i = 0; i < _mountain.PisteCount; i++)
+            bool green = false, blue = false, black = false, expert = false;
+
+            for (int i = 0; i < _mountain.TrailCount; i++)
             {
-                switch (_mountain.pistes[i].grade)
+                Trail run = _mountain.TrailAt(i);
+                if (run == null || !run.open) continue;
+
+                switch (run.grade)
                 {
-                    case PisteGrade.Beginner: green = true; break;
-                    case PisteGrade.Intermediate: blue = true; break;
-                    default: black = true; break;
+                    case TrailGrade.Green: green = true; break;
+                    case TrailGrade.Blue: blue = true; break;
+                    case TrailGrade.Black: black = true; break;
+                    default: expert = true; break;
                 }
             }
 
-            float grades = (green ? 1f : 0f) + (blue ? 1f : 0f) + (black ? 1f : 0f);
-            float park = _park != null ? 0.8f : 0f;
+            float grades = (green ? 1f : 0f) + (blue ? 1f : 0f)
+                         + (black ? 1f : 0f) + (expert ? 0.7f : 0f);
 
-            return Mathf.Clamp01((grades + park) / 3.8f);
+            float park = _parkRig != null && _parkRig.built ? 0.8f : 0f;
+
+            return Mathf.Clamp01((grades + park) / 4.2f);
         }
 
         float Conditions()

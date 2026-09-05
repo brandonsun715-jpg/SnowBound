@@ -68,10 +68,13 @@ namespace SnowBound.Hud
         {
             _canvas = UIBuilder.Canvas(transform, "Inspector", 14);
 
-            _card = UIBuilder.Glass(_canvas.transform, "Card", new Vector2(1f, 0.5f),
-                                    new Vector2(1f, 0.5f),
-                                    new Vector2(-UITheme.Margin, 20f),
-                                    new Vector2(380f, 420f));
+            // Anchored under the top bar and above the dock, so it can never
+            // meet either of them however tall or wide the window is.
+            _card = UIBuilder.Glass(_canvas.transform, "Card", new Vector2(1f, 1f),
+                                    new Vector2(1f, 1f),
+                                    new Vector2(-UILayout.Margin, -UILayout.UnderTopBar),
+                                    new Vector2(UILayout.RailWidth,
+                                                Mathf.Min(410f, UILayout.RailHeight)));
 
             _card.gameObject.AddComponent<CanvasGroup>();
             _panel = _card.gameObject.AddComponent<UIPanel>();
@@ -90,22 +93,22 @@ namespace SnowBound.Hud
                             new Vector2(UITheme.Pad, -UITheme.Pad - 38f), new Vector2(330f, 18f));
 
             UIBuilder.Rule(_card, "Rule", topLeft, topLeft,
-                           new Vector2(UITheme.Pad, -UITheme.Pad - 60f), 380f - UITheme.Pad * 2f);
+                           new Vector2(UITheme.Pad, -UITheme.Pad - 60f), UILayout.RailWidth - UITheme.Pad * 2f);
 
             _labels = UIBuilder.Label(_card, "Labels", UITheme.Label, UITheme.InkMuted,
                                       TextAnchor.UpperLeft);
             UIBuilder.Place(_labels.rectTransform, topLeft, topLeft,
-                            new Vector2(UITheme.Pad, -UITheme.Pad - 78f), new Vector2(200f, 200f));
+                            new Vector2(UITheme.Pad, -UITheme.Pad - 70f), new Vector2(180f, 168f));
 
             _values = UIBuilder.Label(_card, "Values", UITheme.Label, UITheme.Ink,
                                       TextAnchor.UpperRight);
             UIBuilder.Place(_values.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f),
-                            new Vector2(-UITheme.Pad, -UITheme.Pad - 78f), new Vector2(200f, 200f));
+                            new Vector2(-UITheme.Pad, -UITheme.Pad - 70f), new Vector2(190f, 168f));
 
             _stars = UIStars.Create(_card, "Stars", topLeft, topLeft,
-                                    new Vector2(UITheme.Pad, -UITheme.Pad - 236f), 16f, 5f);
+                                    new Vector2(UITheme.Pad, -UITheme.Pad - 248f), 14f, 5f);
 
-            _upgrade = MakeButton("Upgrade", UITheme.Pad + 74f, out _upgradeLabel);
+            _upgrade = MakeButton("Upgrade", UITheme.Pad + 52f, out _upgradeLabel);
             _upgrade.Clicked += Upgrade;
 
             Text closeLabel;
@@ -121,7 +124,7 @@ namespace SnowBound.Hud
             RectTransform button = UIBuilder.Place(UIBuilder.Node(_card, name),
                                                    new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
                                                    new Vector2(0f, fromBottom),
-                                                   new Vector2(380f - UITheme.Pad * 2f, 48f));
+                                                   new Vector2(UILayout.RailWidth - UITheme.Pad * 2f, 42f));
 
             var fill = button.gameObject.AddComponent<Image>();
             fill.sprite = UISprites.Fill(UITheme.RadiusSmall);
@@ -174,8 +177,9 @@ namespace SnowBound.Hud
             switch (selected.kind)
             {
                 case SelectionKind.Facility: ShowFacility(selected.facility); break;
-                case SelectionKind.Trail: ShowTrail(selected.pisteIndex); break;
+                case SelectionKind.Trail: ShowTrail(selected.trail, selected.trailIndex); break;
                 case SelectionKind.Guest: ShowGuest(selected.guest); break;
+                case SelectionKind.Ground: ShowGround(selected.anchor); break;
             }
         }
 
@@ -228,28 +232,64 @@ namespace SnowBound.Hud
                          + Ledger.Money(RevenueToday(line));
         }
 
-        void ShowTrail(int index)
+        void ShowTrail(Trail run, int index)
         {
             _facility = null;
-
-            if (mountain == null || index < 0 || index >= mountain.PisteCount) return;
-
-            PisteDefinition run = mountain.pistes[index];
+            if (run == null) return;
 
             _title.text = run.name.ToUpperInvariant();
-            _subtitle.text = UITheme.Track(SkiHud.GradeName(run.grade) + " RUN");
+            _subtitle.text = UITheme.Track(Trail.GradeName(run.grade) + (run.open ? " RUN" : " RUN  ·  CLOSED"));
             _subtitle.color = SkiHud.GradeColour(run.grade);
 
-            _labels.text = "Length\nVertical drop\nGuests on run\nConditions\nGrooming";
-            _values.text = (mountain.PisteLength(index) / 1000f).ToString("0.00") + " km\n"
-                         + Mathf.RoundToInt(mountain.PisteVertical(index)) + " m\n"
-                         + (guests != null ? guests.GuestsOn(index).ToString() : "0") + "\n"
-                         + (weather != null ? weather.SnowDescription : "Packed") + "\n"
-                         + (run.surfaceNoise < 1.6f ? "Groomed" : "Ungroomed");
+            _labels.text = "Length\nVertical drop\nAverage grade\nMax grade\nWidth\nSnow\nGrooming\nGuests today";
+            _values.text = (run.length / 1000f).ToString("0.00") + " km\n"
+                         + Mathf.RoundToInt(run.drop) + " m\n"
+                         + Mathf.RoundToInt(run.averageGrade * 100f) + "%\n"
+                         + Mathf.RoundToInt(run.maxGrade * 100f) + "%\n"
+                         + Mathf.RoundToInt(run.halfWidth * 2f) + " m\n"
+                         + Trail.SnowName(run.snow) + "\n"
+                         + (run.groomed ? "Groomed" : "Ungroomed") + "\n"
+                         + (guests != null ? guests.GuestsOn(index).ToString() : "0");
 
             _stars.gameObject.SetActive(true);
-            if (rating != null) _stars.Set(rating.Stars);
+            if (rating != null) _stars.Set(rating.Stars * run.Appeal);
 
+            ShowUpgrade(false);
+        }
+
+        /// <summary>
+        /// Open mountain. There is nothing here yet, which is the point: this
+        /// tells the player what the ground is like so they can decide what
+        /// belongs on it.
+        /// </summary>
+        void ShowGround(Vector3 at)
+        {
+            _facility = null;
+            if (mountain == null) return;
+
+            float slope = mountain.SlopeDegrees(at.x, at.z);
+            float grade = Mathf.Tan(slope * Mathf.Deg2Rad);
+
+            _title.text = "OPEN MOUNTAIN";
+            _subtitle.text = UITheme.Track("UNDEVELOPED");
+            _subtitle.color = UITheme.InkMuted;
+
+            _labels.text = "Elevation\nSlope\nGrade\nSuits\nProtected";
+
+            string suits = grade < 0.17f ? "Beginner terrain"
+                         : grade < 0.28f ? "Intermediate terrain"
+                         : grade < 0.42f ? "Advanced terrain"
+                         : "Expert terrain";
+
+            string reserved = mountain.ProtectedBy(at.x, at.z, 0f);
+
+            _values.text = Mathf.RoundToInt(at.y) + " m\n"
+                         + Mathf.RoundToInt(slope) + "\u00b0\n"
+                         + Mathf.RoundToInt(grade * 100f) + "%\n"
+                         + suits + "\n"
+                         + (reserved == null ? "No" : reserved);
+
+            _stars.gameObject.SetActive(false);
             ShowUpgrade(false);
         }
 

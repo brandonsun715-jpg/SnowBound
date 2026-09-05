@@ -5,9 +5,12 @@ using SnowBound.Lifts;
 namespace SnowBound.Audio
 {
     /// <summary>
-    /// The chairlift's motor room. One 3D source at each terminal, because
-    /// that is where the machinery actually is: the hum grows as you skate
-    /// towards the loading area and fades behind you on the way up.
+    /// The lift's motor room. One 3D source at each terminal, because that is
+    /// where the machinery actually is: the hum grows as you skate towards the
+    /// loading area and fades behind you on the way up.
+    ///
+    /// A resort starts without a lift, so this waits for one to be built and
+    /// then wires itself to it, rather than assuming a lift exists.
     /// </summary>
     public class LiftAudio : MonoBehaviour
     {
@@ -21,17 +24,33 @@ namespace SnowBound.Audio
         [Tooltip("Fundamental of the motor, in hertz. Lower is a heavier machine.")]
         public float motorHz = 88f;
 
-        void Start()
+        Chairlift _bound;
+        float _checkedAt = -99f;
+
+        void Update()
         {
-            if (lift == null) lift = Chairlift.Instance;
-            if (lift == null) return;
+            // Cheap, and only until a lift exists.
+            if (Time.time - _checkedAt < 0.5f) return;
+            _checkedAt = Time.time;
+
+            Chairlift found = lift != null ? lift : Chairlift.Instance;
+            if (found == null || found == _bound) return;
+
+            _bound = found;
+            Wire(found);
+        }
+
+        void Wire(Chairlift rig)
+        {
+            for (int i = transform.childCount - 1; i >= 0; i--)
+                Destroy(transform.GetChild(i).gameObject);
 
             AudioClip hum = ProceduralAudio.Hum("LiftMotor", 2f, motorHz, 9001);
 
             // The two ends run the same machinery at slightly different
             // speeds, which stops them phasing into one tone.
-            Terminal("BottomStationAudio", lift.BoardingPoint, hum, 1.0f);
-            Terminal("TopStationAudio", lift.UnloadPoint, hum, 1.06f);
+            Terminal("BottomStationAudio", rig.BoardingPoint, hum, 1.0f);
+            Terminal("TopStationAudio", rig.UnloadPoint, hum, 1.06f);
         }
 
         void Terminal(string name, Vector3 position, AudioClip clip, float pitch)

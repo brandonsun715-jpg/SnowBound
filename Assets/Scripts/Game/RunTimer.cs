@@ -22,10 +22,16 @@ namespace SnowBound.Game
         public PlayerController player;
 
         [Header("Course")]
-        [Tooltip("Distance up the mountain of the start gate.")]
-        public float startZ = 380f;
-        [Tooltip("Distance up the mountain of the finish gate.")]
-        public float finishZ = 60f;
+        [Tooltip("Which run is timed. The gates go on that run's own ends.")]
+        public int trailIndex = 0;
+
+        /// <summary>Distance up the mountain of the start gate, read off the run.</summary>
+        public float startZ { get; private set; }
+        /// <summary>Distance up the mountain of the finish gate.</summary>
+        public float finishZ { get; private set; }
+
+        /// <summary>False until the resort has a run to time.</summary>
+        public bool HasCourse { get; private set; }
 
         public bool Running { get; private set; }
         public float Elapsed { get; private set; }
@@ -61,6 +67,20 @@ namespace SnowBound.Game
 
             Clear();
 
+            Running = false;
+            _armed = false;
+
+            // No run, no course. A new resort has nothing to time.
+            Trail run = mountain.TrailAt(trailIndex);
+            HasCourse = run != null && run.spine != null && run.spine.Count >= 2;
+            if (!HasCourse) return;
+
+            Vector3 top = run.PointAt(0.05f);
+            Vector3 bottom = run.PointAt(0.95f);
+
+            startZ = top.z;
+            finishZ = bottom.z;
+
             var root = new GameObject(ContainerName);
             root.transform.SetParent(transform, false);
 
@@ -68,17 +88,18 @@ namespace SnowBound.Game
             Material startBanner = MaterialFactory.Create("StartBanner", new Color(0.13f, 0.55f, 0.30f), 0.2f);
             Material finishBanner = MaterialFactory.Create("FinishBanner", new Color(0.80f, 0.16f, 0.16f), 0.2f);
 
-            Gate(root.transform, startZ, post, startBanner);
-            Gate(root.transform, finishZ, post, finishBanner);
+            Gate(root.transform, top, run.halfWidth, post, startBanner);
+            Gate(root.transform, bottom, run.halfWidth, post, finishBanner);
 
             foreach (Transform tr in root.GetComponentsInChildren<Transform>(true))
                 tr.gameObject.hideFlags = HideFlags.DontSaveInEditor;
         }
 
-        void Gate(Transform parent, float z, Material postMat, Material bannerMat)
+        void Gate(Transform parent, Vector3 at, float halfWidth, Material postMat, Material bannerMat)
         {
-            float centre = mountain.PisteCenterX(z);
-            float half = mountain.PisteHalfWidth(z) * 0.6f;
+            float z = at.z;
+            float centre = at.x;
+            float half = Mathf.Max(4f, halfWidth * 0.9f);
             const float height = 5.5f;
 
             float leftGround = mountain.SampleHeight(centre - half, z);
@@ -115,7 +136,7 @@ namespace SnowBound.Game
             if (!Application.isPlaying) return;
 
             if (player == null) player = FindAnyObjectByType<PlayerController>();
-            if (player == null) return;
+            if (player == null || !HasCourse) return;
 
             // The lift carries you back up through both gates. That is not a run.
             if (player.IsRiding)

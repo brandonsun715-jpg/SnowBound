@@ -24,8 +24,8 @@ namespace SnowBound.Buildings
         public MountainGenerator mountain;
 
         [Header("Placement (world metres)")]
-        public float positionX = -22f;
-        public float positionZ = 27f;
+        public float positionX = -34f;
+        public float positionZ = 30f;
         [Tooltip("Degrees around Y. Turns the front of the lodge towards the ski run.")]
         public float facingYaw = 70f;
 
@@ -114,6 +114,9 @@ namespace SnowBound.Buildings
             var root = new GameObject(ContainerName);
             root.transform.SetParent(transform, false);
             root.transform.localPosition = new Vector3(positionX, LowestGround(rot), positionZ);
+
+            // The ground the lodge stands on stops being the player's to move.
+            mountain.Protect(new Vector3(positionX, 0f, positionZ), 34f, "Lodge");
             root.transform.localRotation = rot;
 
             Material stone = MaterialFactory.Create("LodgeStone", new Color(0.34f, 0.33f, 0.32f), 0.08f);

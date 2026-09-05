@@ -52,10 +52,12 @@ namespace SnowBound.Hud
         UIButton _older, _newer;
         int _page;
 
-        const int PerPage = 3;
-        const float CardWidth = 336f;
-        const float CardStride = 356f;
-        const float CardLeft = 510f;
+        // Two cards at a time, laid out to fit the narrowest window worth
+        // supporting. Three would run off the side of a four-by-three screen.
+        const int PerPage = 2;
+        const float CardWidth = 318f;
+        const float CardStride = 334f;
+        const float CardLeft = 500f;
 
         void Start()
         {
@@ -125,14 +127,14 @@ namespace SnowBound.Hud
             Text brand = UIBuilder.Label(layer, "Brand", UITheme.Micro, UITheme.InkFaint,
                                          TextAnchor.UpperLeft);
             UIBuilder.Place(brand.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                            new Vector2(UITheme.Margin + 20f, -140f), new Vector2(600f, 18f));
+                            new Vector2(UILayout.Margin + 4f, -140f), new Vector2(600f, 18f));
             brand.text = UITheme.Track(identity != null
                 ? identity.resortName.ToUpperInvariant() : "SNOWBOUND", 2);
 
             Text heading = UIBuilder.Label(layer, "Heading", UITheme.Hero, UITheme.Ink,
                                            TextAnchor.UpperLeft, FontStyle.Bold);
             UIBuilder.Place(heading.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                            new Vector2(UITheme.Margin + 18f, -162f), new Vector2(700f, 56f));
+                            new Vector2(UILayout.Margin + 2f, -162f), new Vector2(700f, 56f));
             heading.text = "RESORT OVERVIEW";
         }
 
@@ -140,7 +142,7 @@ namespace SnowBound.Hud
         {
             RectTransform panel = UIBuilder.Glass(layer, "RatingPanel", new Vector2(0f, 1f),
                                                   new Vector2(0f, 1f),
-                                                  new Vector2(UITheme.Margin, -238f),
+                                                  new Vector2(UILayout.Margin, -238f),
                                                   new Vector2(430f, 460f));
 
             var topLeft = new Vector2(0f, 1f);
@@ -203,11 +205,13 @@ namespace SnowBound.Hud
 
             _pageLabel = UIBuilder.Label(layer, "Page", UITheme.Micro, UITheme.InkFaint,
                                          TextAnchor.MiddleCenter);
-            UIBuilder.Place(_pageLabel.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                            new Vector2(CardLeft + 1000f, -240f), new Vector2(70f, 22f));
+            float right = CardLeft + PerPage * CardStride;
 
-            _older = Arrow(layer, "Older", CardLeft + 950f, "<", -1);
-            _newer = Arrow(layer, "Newer", CardLeft + 1078f, ">", 1);
+            UIBuilder.Place(_pageLabel.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f),
+                            new Vector2(right - 116f, -240f), new Vector2(60f, 22f));
+
+            _older = Arrow(layer, "Older", right - 160f, "<", -1);
+            _newer = Arrow(layer, "Newer", right - 52f, ">", 1);
         }
 
         UIButton Arrow(Transform layer, string name, float x, string glyph, int step)
@@ -264,6 +268,8 @@ namespace SnowBound.Hud
         /// <summary>A building still being positioned is not a facility yet.</summary>
         static bool Ghost(Facility facility)
         {
+            if (facility == null || !facility.Operating) return true;
+
             var placed = facility as PlacedBuilding;
             return placed != null && placed.ghost;
         }
@@ -415,7 +421,7 @@ namespace SnowBound.Hud
             Text footer = UIBuilder.Label(layer, "Footer", UITheme.Label, UITheme.InkFaint,
                                           TextAnchor.LowerCenter);
             UIBuilder.Place(footer.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-                            new Vector2(0f, UITheme.Margin), new Vector2(900f, 24f));
+                            new Vector2(0f, UILayout.Margin), new Vector2(900f, 24f));
             footer.text = UITheme.Track("TAB  RETURN TO THE MOUNTAIN", 1);
         }
 

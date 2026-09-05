@@ -42,7 +42,6 @@ namespace SnowBound.EditorTools
             ConfigureEnvironment();
             CreateMountain();
             CreateLodge();
-            CreateChairlift();
             CreatePlayer();
             AttachCamera();
             CreateWeather();
@@ -102,7 +101,7 @@ namespace SnowBound.EditorTools
                 return;
             }
 
-            gen.Build();
+            gen.Regenerate();
             var props = gen.GetComponent<MountainProps>();
             if (props != null) props.Build();
 
@@ -207,26 +206,22 @@ namespace SnowBound.EditorTools
             var gen = go.AddComponent<MountainGenerator>();
             var props = go.AddComponent<MountainProps>();
 
-            gen.Build();
+            gen.Regenerate();
             props.Build();
 
             // The park lives on its own object. Sharing the mountain's would
             // make clicking the snow indistinguishable from clicking the park.
             go.AddComponent<FarRange>().Build();
 
+            // The park exists as a component but is not raised: a new resort
+            // has one lodge and a bare mountain, and everything else is the
+            // player's decision.
             var parkObject = new GameObject("Terrain Park");
             parkObject.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
-            parkObject.AddComponent<TerrainPark>().Build();
-        }
 
-        static void CreateChairlift()
-        {
-            if (Object.FindAnyObjectByType<Chairlift>() != null) return;
-
-            var go = new GameObject("Chairlift");
-            go.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
-            go.AddComponent<Chairlift>().Build();
-            go.AddComponent<LiftAudio>();
+            var park = parkObject.AddComponent<TerrainPark>();
+            park.built = false;
+            park.Build();
         }
 
         static void CreatePlayer()
@@ -239,9 +234,11 @@ namespace SnowBound.EditorTools
             body.height = 1.8f;
             body.radius = 0.35f;
             body.center = new Vector3(0f, 0.9f, 0f);
-            body.slopeLimit = 45f;
-            body.stepOffset = 0.45f;
-            body.skinWidth = 0.05f;
+            // PlayerController tightens these further at runtime; these are the
+            // values the object is created with so the scene reads correctly.
+            body.slopeLimit = 82f;
+            body.stepOffset = 0.35f;
+            body.skinWidth = 0.035f;
 
             go.AddComponent<PlayerInputReader>();
             go.AddComponent<PlayerVisual>();
@@ -252,6 +249,7 @@ namespace SnowBound.EditorTools
             go.AddComponent<SnowTrackWriter>();
             go.AddComponent<RideAudio>();
             go.AddComponent<PlayerController>();
+            go.AddComponent<TerrainGuard>();
 
             var lodge = Object.FindAnyObjectByType<LodgeBuilder>();
             if (lodge != null) go.transform.position = lodge.EntrancePosition + Vector3.up * 0.3f;
@@ -270,7 +268,9 @@ namespace SnowBound.EditorTools
             go.AddComponent<SelectionController>();
             go.AddComponent<ModeDirector>();
             go.AddComponent<BuildController>();
-            go.AddComponent<TrailBuilder>();
+            go.AddComponent<TrailDesigner>();
+            go.AddComponent<TerrainSculptor>();
+            go.AddComponent<LiftPlacer>();
         }
 
         static void CreateWeather()
@@ -301,11 +301,12 @@ namespace SnowBound.EditorTools
             go.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
             go.AddComponent<GearRack>().Build();
             go.AddComponent<RunTimer>().Build();
+            go.AddComponent<LiftAudio>();
             go.AddComponent<SkiHud>();
             go.AddComponent<NotificationStack>();
             go.AddComponent<ManagementScreen>();
             go.AddComponent<ManagementHud>();
-            go.AddComponent<BuildPanel>();
+            go.AddComponent<ToolDock>();
             go.AddComponent<InspectorPanel>();
             go.AddComponent<DaySummary>();
             go.AddComponent<HudDirector>();
@@ -328,19 +329,8 @@ namespace SnowBound.EditorTools
             go.AddComponent<ResortTraffic>();
             go.AddComponent<GuestDirector>();
 
-            var lift = Object.FindAnyObjectByType<Chairlift>();
-            if (lift != null && lift.GetComponent<LiftFacility>() == null)
-            {
-                var facility = lift.gameObject.AddComponent<LiftFacility>();
-                facility.displayName = "Chairlift";
-                facility.lift = lift;
-                facility.baseDailyUpkeep = 3200f;
-                facility.upkeepPerLevel = 2400f;
-                facility.baseQuality = 0.42f;
-                facility.qualityPerLevel = 0.20f;
-                facility.baseUpgradeCost = 14000f;
-                facility.upgradeCostPerLevel = 11000f;
-            }
+            // No lift. A new resort buys its own, which is the first real
+            // decision the player makes about the mountain.
 
             var lodge = Object.FindAnyObjectByType<LodgeBuilder>();
             if (lodge != null && lodge.GetComponent<LodgeFacility>() == null)

@@ -33,7 +33,7 @@ Assets/
     UI/                   the interface
       Theme/              the design system: colours, sprites, icons, motion
     Player/               character, locomotion modes, input, camera
-    Mountain/             terrain generation and scene dressing
+    Mountain/             the height field, its chunks, the runs, scene dressing
     Lifts/                chairlift
   Prefabs/
   Materials/
@@ -83,6 +83,24 @@ Milestone 2 is complete.
 
 Milestone 3 is complete.
 
+## Milestone 4 — the player designs the mountain
+
+The resort is no longer handed to you. A new game is one lodge on an
+undeveloped mountain and some cash.
+
+1. **Collision rebuilt from the ground up** — one height field, chunked
+   meshes, and each chunk's collider is that same mesh. *(done)*
+2. **Terrain sculpting** — raise, lower, smooth, flatten, sculpt slope, and
+   paint the snow. *(done)*
+3. **Trail design** — draw a run down the mountain and it is cut into the
+   terrain. *(done)*
+4. **Trail properties** — difficulty, width, grade, snow quality, grooming,
+   open or closed, all measured off the real terrain. *(done)*
+5. **Lift shop** — surface lift, chairlift, high-speed chair, gondola, each
+   placed station to station. *(done)*
+6. **Interface** — one top bar, one tool dock, one inspector rail, laid out so
+   they cannot overlap at any aspect ratio. *(done)*
+
 ## Building the scene
 
 Top menu bar → **SnowBound → Build Mountain Scene**. This creates the scene,
@@ -103,17 +121,38 @@ props after changing generator settings.
 | `W A S D` / arrows | Pan the camera |
 | Scroll wheel | Zoom |
 | Middle mouse drag | Rotate |
-| Left click | Select a lift, building, trail or guest |
-| `Tab` | Facilities and upgrades |
-| BUILD / TERRAIN | Open the build menu |
+| Left click | Select a lift, building, run, guest or open ground |
+| `Tab` | Resort overview: rating, facilities, upgrades |
+| BUILD / TERRAIN / TRAILS / LIFTS | The tool dock along the bottom |
 | ENTER MOUNTAIN | Fly down and take control |
 
-**Placing something**
+**Shaping the mountain** (TERRAIN)
+
+| Input | Action |
+|---|---|
+| Hold left mouse | Apply the brush where the ring is |
+| `-` / `+` on SIZE | Brush radius |
+| `-` / `+` on STRENGTH | How hard it pushes |
+| A snow button | Then click a run to change its snow or grooming |
+| `Esc` | Put the brush down |
+
+**Designing a run** (TRAILS)
+
+| Input | Action |
+|---|---|
+| Pick a difficulty | Starts a new run at that shape |
+| Left click | Add a control point, summit first |
+| Right click | Undo the last point |
+| `-` / `+` on WIDTH | Narrow or widen the run |
+| CONFIRM RUN | Pay for it and cut it into the mountain |
+| `Esc` | Abandon it |
+
+**Placing a building or a lift**
 
 | Input | Action |
 |---|---|
 | Move the mouse | Position it. Green is allowed, red is not, and it says why |
-| Left click | Place it and pay |
+| Left click | Place it and pay. A lift takes two clicks: bottom station, then top |
 | `R` | Rotate a building by 45° |
 | `Esc` / right click | Put it back down |
 
@@ -282,6 +321,37 @@ was created with; picking the wrong one leaves every button silently dead.
 - `MountainGenerator` is the single source of truth for ground height.
   Other systems call `SampleHeight(x, z)`, `PisteCenterX(z)` and
   `PistePoint(z)` instead of guessing or raycasting.
+- **The height field is the mountain.** One array of heights; the chunk meshes
+  are built from it and each chunk's collider is that same mesh; `SampleHeight`
+  is the same bilinear interpolation the triangles perform. So the surface you
+  see, the surface you stand on and the surface the game reasons about are one
+  surface by construction, not three that have to be kept in agreement.
+- The field is three layers: the natural mountain, then the player's sculpting,
+  then the runs carved into the result. Sculpting writes to its own layer, so
+  cutting a new run never flattens the shaping done before it, and shaping the
+  ground under a run re-cuts that run and changes its measured grade.
+- The terrain is chunked so a brush stroke costs the chunks it touched rather
+  than the whole mountain, and collision is re-cooked when the stroke ends
+  rather than on every frame of it.
+- A run is a line the player drew: control points, a Catmull-Rom spline, and a
+  width. Carving forces the centre line to descend, so a run always skis and
+  can never contain an uphill section, however the line was drawn.
+- A run's difficulty is measured, not chosen. Length, vertical, average grade
+  and max grade come off the terrain, and the grade category follows from them
+  and from the width. Drawing a gentle line and calling it a black run does not
+  make it one.
+- The player cannot fall through the world. Collision is exact, the character
+  body's steps are split so a fast rider cannot sweep past a face, and
+  `TerrainGuard` is the net under all of it: it acts only when the body is
+  genuinely inside the mountain or outside the map, and never interrupts a jump.
+- Ground the resort depends on is protected. The lodge's footings and every
+  lift station refuse to be sculpted, and say which building is refusing.
+- The interface is banded: a top bar, a tool dock along the bottom, an
+  inspector rail on the right, and nothing in the middle. The dock shows one
+  page at a time, which is what makes overlapping tool panels impossible rather
+  than merely unlikely. Every panel is anchored to the edge it belongs to and
+  sized against a four-by-three window, so it cannot run off the side of a
+  narrow one or drift apart on an ultrawide.
 - `FarRange` puts ridges and peaks out to nearly two kilometres so the resort
   sits in a mountain range instead of on a slab in a void. Inside the playable
   rectangle it hides a few metres under the real terrain rather than being cut

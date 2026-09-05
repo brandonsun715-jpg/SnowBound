@@ -22,9 +22,11 @@ namespace SnowBound.Hud
         public SkiHud skiHud;
         public ManagementHud managementHud;
         public ManagementScreen overview;
-        public BuildPanel build;
+        public ToolDock dock;
         public BuildController builder;
-        public TrailBuilder trails;
+        public TrailDesigner trails;
+        public TerrainSculptor sculptor;
+        public LiftPlacer lifts;
         public DaySummary summary;
         public NotificationStack notifications;
         public ResortRating rating;
@@ -43,9 +45,11 @@ namespace SnowBound.Hud
             if (skiHud == null) skiHud = FindAnyObjectByType<SkiHud>();
             if (managementHud == null) managementHud = FindAnyObjectByType<ManagementHud>();
             if (overview == null) overview = FindAnyObjectByType<ManagementScreen>();
-            if (build == null) build = FindAnyObjectByType<BuildPanel>();
+            if (dock == null) dock = FindAnyObjectByType<ToolDock>();
             if (builder == null) builder = FindAnyObjectByType<BuildController>();
-            if (trails == null) trails = FindAnyObjectByType<TrailBuilder>();
+            if (trails == null) trails = FindAnyObjectByType<TrailDesigner>();
+            if (sculptor == null) sculptor = FindAnyObjectByType<TerrainSculptor>();
+            if (lifts == null) lifts = FindAnyObjectByType<LiftPlacer>();
             if (summary == null) summary = FindAnyObjectByType<DaySummary>();
             if (notifications == null) notifications = FindAnyObjectByType<NotificationStack>();
             if (rating == null) rating = ResortRating.Instance;
@@ -60,7 +64,7 @@ namespace SnowBound.Hud
             {
                 Dress(false, false);
                 if (overview != null) overview.Close();
-                if (build != null) build.Close();
+                if (dock != null) dock.Close();
                 return;
             }
 
@@ -84,7 +88,7 @@ namespace SnowBound.Hud
             if (management) return;
 
             if (overview != null && overview.IsOpen) overview.Close();
-            if (build != null && build.IsOpen) build.Close();
+            if (dock != null && dock.IsOpen) dock.Close();
         }
 
         /// <summary>
@@ -97,9 +101,11 @@ namespace SnowBound.Hud
             if (ManagementInput.BackPressed)
             {
                 if (builder != null && builder.Placing) { builder.Cancel(); return; }
-                if (trails != null && trails.Planning) { trails.Cancel(); return; }
+                if (trails != null && trails.Designing) { trails.Cancel(); return; }
+                if (lifts != null && lifts.Placing) { lifts.Cancel(); return; }
+                if (sculptor != null && sculptor.Active) { sculptor.End(); return; }
 
-                if (managing && build != null && build.IsOpen) { build.Close(); return; }
+                if (managing && dock != null && dock.IsOpen) { dock.Close(); return; }
                 if (managing && overview != null && overview.IsOpen) { overview.Close(); return; }
 
                 if (riding && modes != null) modes.EnterManagement();
@@ -112,7 +118,7 @@ namespace SnowBound.Hud
             if (riding && modes != null) { modes.EnterManagement(); return; }
             if (!managing || overview == null) return;
 
-            if (build != null) build.Close();
+            if (dock != null) dock.Close();
 
             if (overview.IsOpen) overview.Close();
             else overview.Open();

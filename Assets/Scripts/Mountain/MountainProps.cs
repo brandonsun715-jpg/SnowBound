@@ -27,8 +27,8 @@ namespace SnowBound.Mountain
         [Header("Pine trees")]
         public int treeCount = 900;
         [Tooltip("No trees are placed above this height (metres).")]
-        public float treeLine = 130f;
-        [Tooltip("Keep trees this far away from the edge of the ski run.")]
+        public float treeLine = 168f;
+        [Tooltip("Keep trees this far away from the edge of a run.")]
         public float pisteClearance = 8f;
         public float minTreeHeight = 6f;
         public float maxTreeHeight = 15f;
@@ -164,7 +164,7 @@ namespace SnowBound.Mountain
                 float x = Rand(-halfW + 12f, halfW - 12f);
                 float z = Rand(12f, mountain.length - 12f);
 
-                if (mountain.IsOnPiste(x, z, pisteClearance)) continue;
+                if (mountain.OnAnyTrail(x, z, pisteClearance)) continue;
 
                 float h = mountain.SampleHeight(x, z);
                 if (h > treeLine) continue;
@@ -225,7 +225,7 @@ namespace SnowBound.Mountain
 
                 // Strictly off-piste: keeps the run clean and keeps rocks out
                 // of the base area where the lodge stands.
-                if (mountain.IsOnPiste(x, z, 2f)) continue;
+                if (mountain.OnAnyTrail(x, z, 2f)) continue;
 
                 float sx = Rand(minRockSize, maxRockSize);
                 float sy = sx * Rand(0.5f, 0.9f);
@@ -286,34 +286,46 @@ namespace SnowBound.Mountain
 
             if (markerSpacing < 5f) markerSpacing = 5f;
 
-            for (int i = 0; i < mountain.PisteCount; i++)
+            // Markers follow the run's own centre line, so a run that snakes
+            // across the mountain is marked along the line the player drew
+            // rather than along a straight guess at it.
+            for (int i = 0; i < mountain.TrailCount; i++)
             {
-                int gradeSlot = GradeSlot(mountain.pistes[i].grade);
+                Trail trail = mountain.TrailAt(i);
+                if (trail == null || trail.spine == null || trail.spine.Count < 2) continue;
 
-                for (float z = 25f; z < mountain.length - 25f; z += markerSpacing)
+                int gradeSlot = GradeSlot(trail.grade);
+                int steps = Mathf.Max(2, Mathf.RoundToInt(trail.length / markerSpacing));
+
+                for (int s = 1; s < steps; s++)
                 {
-                    // Near the base and the summit the runs lie on top of one
-                    // another, so only the first one is marked there.
-                    if (i > 0 && mountain.PisteSpread(z) < 0.15f) continue;
+                    float along = s / (float)steps;
 
-                    float centre = mountain.PisteCenterX(i, z);
-                    float half = mountain.PisteHalfWidth(i, z);
+                    Vector3 here = trail.PointAt(along);
+                    Vector3 ahead = trail.PointAt(Mathf.Min(1f, along + 0.01f));
 
-                    Marker(batch, gradeSlot, centre - half - 1.5f, z, pole);
-                    Marker(batch, 0, centre + half + 1.5f, z, pole);
+                    Vector3 forward = ahead - here;
+                    forward.y = 0f;
+                    if (forward.sqrMagnitude < 0.001f) continue;
+
+                    Vector3 across = Vector3.Cross(Vector3.up, forward.normalized);
+                    float half = trail.halfWidth + 1.5f;
+
+                    Marker(batch, gradeSlot, here.x - across.x * half, here.z - across.z * half, pole);
+                    Marker(batch, 0, here.x + across.x * half, here.z + across.z * half, pole);
                 }
             }
 
             batch.Flush();
         }
 
-        static int GradeSlot(PisteGrade grade)
+        static int GradeSlot(TrailGrade grade)
         {
             switch (grade)
             {
-                case PisteGrade.Beginner: return 1;
-                case PisteGrade.Advanced: return 3;
-                default: return 2;
+                case TrailGrade.Green: return 1;
+                case TrailGrade.Blue: return 2;
+                default: return 3;
             }
         }
 

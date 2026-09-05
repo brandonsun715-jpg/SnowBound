@@ -43,6 +43,13 @@ namespace SnowBound.Resort
         /// <summary>One line describing what this level actually gives you.</summary>
         public abstract string LevelSummary { get; }
 
+        /// <summary>
+        /// Whether this facility actually exists yet. A component can be in the
+        /// scene waiting to be built; until it is, it costs nothing to run and
+        /// counts for nothing.
+        /// </summary>
+        public virtual bool Operating { get { return true; } }
+
         void Start() { ApplyLevel(); }
 
         /// <summary>Push this facility's level into whatever it actually controls.</summary>

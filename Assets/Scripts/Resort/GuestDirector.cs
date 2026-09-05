@@ -30,8 +30,6 @@ namespace SnowBound.Resort
         [Header("Crowd")]
         [Tooltip("How many guests exist as actual people at once.")]
         public int maxLiveGuests = 40;
-        [Tooltip("Below this z the run counts as finished.")]
-        public float finishZ = 58f;
         [Tooltip("Guests stop starting new runs this long before closing.")]
         public float closingHours = 1f;
 
@@ -197,6 +195,7 @@ namespace SnowBound.Resort
             guest.happiness = Mathf.Clamp01(Random.Range(0.60f, 0.85f) + AmenityHappiness());
             guest.gear = Random.value < 0.32f ? LocomotionKind.Snowboard : LocomotionKind.Ski;
             guest.preferredPiste = ChoosePiste(guest.ability);
+            guest.run = mountain.TrailAt(guest.preferredPiste);
 
             guest.Begin(this, ArrivalPoint(), skis, board);
 
@@ -204,18 +203,34 @@ namespace SnowBound.Resort
             BookBuildingTrade(guest);
         }
 
-        /// <summary>Better skiers pick the harder run; beginners stay on the blue.</summary>
+        /// <summary>
+        /// Better skiers pick the harder run; beginners stay on the green.
+        /// Closed runs are not offered. Returns -1 when the resort has nothing
+        /// open, which is the state a brand new resort is in.
+        /// </summary>
         int ChoosePiste(float ability)
         {
-            if (mountain == null || mountain.PisteCount == 0) return 0;
+            if (mountain == null || mountain.TrailCount == 0) return -1;
 
-            int best = 0;
+            int best = -1;
             float bestScore = float.MaxValue;
 
-            for (int i = 0; i < mountain.PisteCount; i++)
+            for (int i = 0; i < mountain.TrailCount; i++)
             {
-                float demanded = mountain.pistes[i].grade == PisteGrade.Advanced ? 0.78f
-                               : mountain.pistes[i].grade == PisteGrade.Beginner ? 0.15f : 0.45f;
+                Trail run = mountain.TrailAt(i);
+                if (run == null || !run.open) continue;
+
+                float demanded;
+                switch (run.grade)
+                {
+                    case TrailGrade.Green: demanded = 0.15f; break;
+                    case TrailGrade.Blue: demanded = 0.42f; break;
+                    case TrailGrade.Black: demanded = 0.72f; break;
+                    default: demanded = 0.9f; break;
+                }
+
+                // Nobody takes a run well beyond them; the rest is preference.
+                if (demanded > ability + 0.25f) continue;
 
                 float score = Mathf.Abs(ability - demanded) + Random.value * 0.18f;
                 if (score < bestScore) { bestScore = score; best = i; }
@@ -288,14 +303,14 @@ namespace SnowBound.Resort
         }
 
         /// <summary>How many live guests are on a given run right now.</summary>
-        public int GuestsOn(int pisteIndex)
+        public int GuestsOn(int trailIndex)
         {
             int count = 0;
             for (int i = 0; i < _guests.Count; i++)
             {
                 Guest guest = _guests[i];
                 if (guest == null) continue;
-                if (guest.preferredPiste != pisteIndex) continue;
+                if (guest.preferredPiste != trailIndex) continue;
                 if (guest.activity != Guest.Activity.Descending) continue;
                 count++;
             }

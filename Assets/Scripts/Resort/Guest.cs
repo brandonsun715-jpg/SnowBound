@@ -38,6 +38,7 @@ namespace SnowBound.Resort
         [Tooltip("0 is a first timer, 1 skis anything.")]
         [Range(0f, 1f)] public float ability = 0.5f;
         public int preferredPiste;
+        [System.NonSerialized] public Trail run;
         public LocomotionKind gear = LocomotionKind.Ski;
         public Activity activity = Activity.Arriving;
 
@@ -208,9 +209,18 @@ namespace SnowBound.Resort
         {
             if (_mountain == null) { activity = Activity.Leaving; Head(_entrance); return; }
 
-            float z = transform.position.z;
+            if (run == null) run = _mountain.TrailAt(preferredPiste);
+            if (run == null || run.spine == null || run.spine.Count < 2)
+            {
+                activity = Activity.Leaving;
+                Head(_entrance);
+                return;
+            }
 
-            if (z <= _director.finishZ)
+            float along;
+            run.DistanceTo(transform.position.x, transform.position.z, out along);
+
+            if (along >= 0.97f)
             {
                 RunsCompleted++;
                 happiness = Mathf.Clamp01(happiness + 0.06f);
@@ -234,17 +244,26 @@ namespace SnowBound.Resort
             }
 
             // Follow the run's centre line, offset a little so a crowd of
-            // guests spreads across the piste instead of forming a conga line.
-            float ahead = Mathf.Max(0f, z - 14f);
-            float half = _mountain.PisteHalfWidth(preferredPiste, ahead);
-            Vector3 point = _mountain.PistePoint(preferredPiste, ahead);
-            point.x += _lateral * half;
+            // guests spreads across the run instead of forming a conga line.
+            float lookAhead = Mathf.Min(1f, along + 18f / Mathf.Max(40f, run.length));
+            Vector3 point = run.PointAt(lookAhead);
+
+            Vector3 forward = run.PointAt(Mathf.Min(1f, lookAhead + 0.01f)) - point;
+            forward.y = 0f;
+
+            if (forward.sqrMagnitude > 0.001f)
+            {
+                Vector3 across = Vector3.Cross(Vector3.up, forward.normalized);
+                point += across * (_lateral * run.halfWidth * 0.8f);
+            }
 
             Vector3 flat = point - transform.position;
             flat.y = 0f;
             if (flat.sqrMagnitude < 0.01f) flat = Vector3.back;
 
-            float speed = Mathf.Lerp(7f, 17f, ability);
+            // Loose snow is slower than a groomed run, and the better skiers
+            // get more out of both.
+            float speed = Mathf.Lerp(7f, 17f, ability) / Mathf.Max(0.6f, run.Drag);
             Advance(flat.normalized, speed, dt);
         }
 

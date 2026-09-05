@@ -35,6 +35,8 @@ namespace SnowBound.Game
         public float clearOfPiste = 4f;
         [Tooltip("And no further than this from one, or they are in the wilderness.")]
         public float nearPiste = 70f;
+        [Tooltip("The base area counts as somewhere worth building, run or not.")]
+        public float nearBase = 110f;
         public float spacing = 6f;
         public float rotateStep = 45f;
 
@@ -141,9 +143,16 @@ namespace SnowBound.Game
 
             float half = Mathf.Max(Pending.footprint.x, Pending.footprint.y) * 0.5f;
 
-            if (mountain.IsOnPiste(point.x, point.z, clearOfPiste - half))
+            if (mountain.OnAnyTrail(point.x, point.z, clearOfPiste - half))
             {
                 Refusal = "That would block the run";
+                return false;
+            }
+
+            string reserved = mountain.ProtectedBy(point.x, point.z, half);
+            if (reserved != null)
+            {
+                Refusal = "Too close to the " + reserved.ToLowerInvariant();
                 return false;
             }
 
@@ -173,12 +182,29 @@ namespace SnowBound.Game
             return true;
         }
 
+        /// <summary>
+        /// Somewhere a guest would actually walk past: beside a run, or in the
+        /// base area. On a new resort there are no runs at all, so the base
+        /// area is the only place worth putting anything, which is exactly the
+        /// decision the player should be making first.
+        /// </summary>
         bool NearARun(Vector3 point, float half)
         {
-            for (int i = 0; i < mountain.PisteCount; i++)
+            var lodge = SnowBound.Buildings.LodgeBuilder.Instance;
+            if (lodge != null)
             {
-                float distance = Mathf.Abs(point.x - mountain.PisteCenterX(i, point.z))
-                               - mountain.PisteHalfWidth(i, point.z);
+                Vector3 gap = lodge.EntrancePosition - point;
+                gap.y = 0f;
+                if (gap.magnitude - half < nearBase) return true;
+            }
+
+            for (int i = 0; i < mountain.TrailCount; i++)
+            {
+                Trail run = mountain.TrailAt(i);
+                if (run == null) continue;
+
+                float along;
+                float distance = run.DistanceTo(point.x, point.z, out along) - run.halfWidth;
 
                 if (distance - half < nearPiste) return true;
             }

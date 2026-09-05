@@ -341,12 +341,11 @@ namespace SnowBound.Hud
             _shownSpeed = UITheme.Approach(_shownSpeed, kph, speedEase, dt);
             _speed.text = Mathf.RoundToInt(_shownSpeed).ToString();
 
-            int piste = CurrentPiste();
-            if (piste >= 0 && mountain != null)
+            Trail run = CurrentTrail();
+            if (run != null)
             {
-                PisteDefinition run = mountain.pistes[piste];
                 _trailName.text = run.name.ToUpperInvariant();
-                _trailGrade.text = UITheme.Track(GradeName(run.grade));
+                _trailGrade.text = UITheme.Track(Trail.GradeName(run.grade));
                 _trailGrade.color = GradeColour(run.grade);
             }
             else
@@ -426,30 +425,32 @@ namespace SnowBound.Hud
 
         float LiftVertical()
         {
+            if (lift == null) lift = Chairlift.Instance;
             if (lift == null) return 0f;
             return Mathf.Max(0f, lift.UnloadPoint.y - lift.BoardingPoint.y);
         }
 
         void UpdateTrailIntro(float dt)
         {
-            int piste = CurrentPiste();
+            Trail run = CurrentTrail();
+            int index = run != null && mountain != null ? mountain.IndexOf(run) : -1;
 
-            if (piste >= 0 && piste != _lastPiste && player.IsRidingSnow && player.Speed > 4f)
+            if (index >= 0 && index != _lastPiste && player.IsRidingSnow && player.Speed > 4f)
             {
-                _lastPiste = piste;
-                PisteDefinition run = mountain.pistes[piste];
+                _lastPiste = index;
 
                 _trailTitle.text = run.name.ToUpperInvariant();
-                _trailSub.text = UITheme.Track(GradeName(run.grade) + " RUN", 2);
+                _trailSub.text = UITheme.Track(Trail.GradeName(run.grade) + " RUN", 2);
                 _trailSub.color = GradeColour(run.grade);
-                _trailStats.text = (mountain.PisteLength(piste) / 1000f).ToString("0.0") + " KM"
-                                 + "        " + Mathf.RoundToInt(mountain.PisteVertical(piste)) + " M VERTICAL";
+                _trailStats.text = (run.length / 1000f).ToString("0.0") + " KM"
+                                 + "        " + Mathf.RoundToInt(run.drop) + " M VERTICAL"
+                                 + "        " + Mathf.RoundToInt(run.averageGrade * 100f) + "% AVG";
 
                 _trailCardLeft = trailCardSeconds;
                 _trailPanel.Show();
             }
 
-            if (piste < 0) _lastPiste = -1;
+            if (index < 0) _lastPiste = -1;
 
             if (_trailCardLeft <= 0f) return;
 
@@ -457,33 +458,24 @@ namespace SnowBound.Hud
             if (_trailCardLeft <= 0f) _trailPanel.Hide();
         }
 
-        int CurrentPiste()
+        Trail CurrentTrail()
         {
-            if (mountain == null || player == null) return -1;
+            if (mountain == null || player == null) return null;
 
             Vector3 at = player.transform.position;
-            if (!mountain.IsOnPiste(at.x, at.z, 4f)) return -1;
-
-            return mountain.NearestPiste(at.x, at.z);
+            return mountain.TrailUnder(at.x, at.z, 4f);
         }
 
-        public static string GradeName(PisteGrade grade)
+        public static string GradeName(TrailGrade grade) { return Trail.GradeName(grade); }
+
+        public static Color GradeColour(TrailGrade grade)
         {
             switch (grade)
             {
-                case PisteGrade.Beginner: return "GREEN";
-                case PisteGrade.Advanced: return "BLACK";
-                default: return "BLUE";
-            }
-        }
-
-        public static Color GradeColour(PisteGrade grade)
-        {
-            switch (grade)
-            {
-                case PisteGrade.Beginner: return UITheme.GradeGreen;
-                case PisteGrade.Advanced: return UITheme.GradeRed;
-                default: return UITheme.GradeBlue;
+                case TrailGrade.Green: return UITheme.GradeGreen;
+                case TrailGrade.Blue: return UITheme.GradeBlue;
+                case TrailGrade.Black: return UITheme.GradeRed;
+                default: return UITheme.GradeBlack;
             }
         }
     }

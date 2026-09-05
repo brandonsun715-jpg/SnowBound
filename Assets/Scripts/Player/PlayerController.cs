@@ -19,6 +19,10 @@ namespace SnowBound.Player
         [Header("Physics")]
         [Tooltip("Stronger than real gravity because it makes jumps feel crisp.")]
         public float gravity = -25f;
+        [Tooltip("Steepest ground the body will walk onto. Skiing needs this high:\nat the default 45 degrees a black run is a wall, and the controller\nresolves being pressed into a wall by squeezing through it.")]
+        public float slopeLimit = 82f;
+        [Tooltip("Longest single move before it is split up. Keeps a fast rider\nfrom stepping straight past a face between one frame and the next.")]
+        public float maxStepDistance = 0.35f;
         [Tooltip("Layers counted as ground. Leave as Everything.")]
         public LayerMask groundMask = ~0;
         [Tooltip("The terrain mesh is faceted, so raw hit normals step from one\ntriangle to the next. Smoothing them keeps the ride steady.")]
@@ -116,6 +120,8 @@ namespace SnowBound.Player
             Body = GetComponent<CharacterController>();
             Input = GetComponent<PlayerInputReader>();
 
+            ConfigureBody();
+
             foreach (var mode in GetComponents<LocomotionMode>()) mode.Bind(this);
 
             _visual = GetComponentInChildren<PlayerVisual>(true);
@@ -150,8 +156,43 @@ namespace SnowBound.Player
 
             if (_active != null) _active.Tick(dt);
 
-            Body.Move((Velocity + GroundStick) * dt);
+            StepBody((Velocity + GroundStick) * dt);
             GroundStick = Vector3.zero;
+        }
+
+        /// <summary>
+        /// The CharacterController sweeps its capsule, but only once per call.
+        /// At forty metres a second a single frame is most of a metre, and a
+        /// sweep that long can step over a thin face or resolve on the far
+        /// side of one. Splitting the move keeps every step shorter than the
+        /// body is wide, which is the condition under which sweeping is
+        /// actually reliable.
+        /// </summary>
+        void StepBody(Vector3 move)
+        {
+            float distance = move.magnitude;
+            if (distance <= 0.0001f) return;
+
+            float limit = Mathf.Max(0.05f, maxStepDistance);
+            int steps = Mathf.Clamp(Mathf.CeilToInt(distance / limit), 1, 12);
+
+            Vector3 slice = move / steps;
+            for (int i = 0; i < steps; i++) Body.Move(slice);
+        }
+
+        /// <summary>
+        /// Collision settings the rest of the game depends on. Left at Unity's
+        /// defaults, a CharacterController treats anything past 45 degrees as
+        /// a wall, which on a mountain is most of the interesting terrain.
+        /// </summary>
+        void ConfigureBody()
+        {
+            if (Body == null) return;
+
+            Body.slopeLimit = Mathf.Clamp(slopeLimit, 30f, 89f);
+            Body.stepOffset = Mathf.Min(Body.stepOffset, Body.height * 0.3f);
+            Body.skinWidth = Mathf.Max(0.02f, Body.radius * 0.1f);
+            Body.minMoveDistance = 0f;
         }
 
         // ---------------- ground ----------------------------------------
@@ -258,9 +299,25 @@ namespace SnowBound.Player
         public void Teleport(Vector3 position)
         {
             Body.enabled = false;
-            transform.position = position;
+            transform.position = Surfaced(position);
             Body.enabled = true;
             Velocity = Vector3.zero;
+        }
+
+        /// <summary>
+        /// Never put the body below the snow. Re-enabling a CharacterController
+        /// inside a collider is how a spawn or a lift unload turns into a fall
+        /// through the world.
+        /// </summary>
+        Vector3 Surfaced(Vector3 position)
+        {
+            var mountain = SnowBound.Mountain.MountainGenerator.Instance;
+            if (mountain == null || !mountain.Ready) return position;
+
+            float floor = mountain.SampleHeight(position.x, position.z) + Body.height * 0.5f;
+            if (position.y < floor) position.y = floor;
+
+            return position;
         }
 
         // ---------------- riding a lift ---------------------------------
@@ -313,7 +370,7 @@ namespace SnowBound.Player
             Input.enableInput = true;
 
             Body.enabled = false;
-            transform.position = position;
+            transform.position = Surfaced(position);
             if (facing.sqrMagnitude > 0.0001f)
                 transform.rotation = Quaternion.LookRotation(facing.normalized, Vector3.up);
             Body.enabled = true;

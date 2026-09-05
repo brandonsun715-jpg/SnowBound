@@ -10,9 +10,9 @@ namespace SnowBound.Lifts
     /// A working fixed-grip chairlift: two terminals, towers between them,
     /// a cable loop, and chairs that never stop moving.
     ///
-    /// It lays its own line out by asking the mountain where the piste is,
-    /// so the lift always runs just inside the right-hand edge of the run
-    /// however the terrain is retuned.
+    /// The line runs between two stations the player chose. Everything else —
+    /// tower spacing, cable height, where you stand to be picked up — is
+    /// worked out from those two points and the ground between them.
     ///
     /// Boarding is automatic. Stand in the loading area and the next free
     /// chair picks you up; the lift sets you down again at the top. That is
@@ -31,13 +31,20 @@ namespace SnowBound.Lifts
         public MountainGenerator mountain;
         public PlayerController player;
 
+        [Header("Type")]
+        public LiftKind kind = LiftKind.Chair;
+        [Tooltip("People per carrier. The shop's capacity figure comes from this.")]
+        public int seats = 4;
+
         [Header("Line")]
-        public float bottomZ = 45f;
-        public float topZ = 402f;
-        [Tooltip("Metres inside the right-hand edge of the piste.")]
-        public float edgeInset = 6f;
+        [Tooltip("Bottom station, world XZ. Set by the placement tool.")]
+        public Vector2 bottomStation = new Vector2(40f, 50f);
+        [Tooltip("Top station, world XZ.")]
+        public Vector2 topStation = new Vector2(40f, 500f);
         [Tooltip("Towers including both terminals.")]
-        public int towerCount = 8;
+        public int towerCount = 9;
+        [Tooltip("Metres of line per tower. The tower count follows the length.")]
+        public float metresPerTower = 62f;
 
         [Header("Heights")]
         public float towerHeight = 9f;
@@ -48,7 +55,7 @@ namespace SnowBound.Lifts
         public float trackSpacing = 4.4f;
 
         [Header("Operation")]
-        public float lineSpeed = 9f;
+        public float lineSpeed = 2.5f;
         [Tooltip("Metres between chairs. At 9 m/s, 26 m is a chair every three seconds.")]
         public float chairSpacing = 26f;
         [Tooltip("How close to the loading point you must stand.")]
@@ -87,7 +94,62 @@ namespace SnowBound.Lifts
         float _boardS;
         float _unloadS;
 
-        void OnEnable() { _instance = this; }
+        void OnEnable() { if (_instance == null) _instance = this; }
+
+        /// <summary>Riders are towed along the snow rather than carried above it.</summary>
+        public bool Towed { get { return kind == LiftKind.Surface; } }
+
+        /// <summary>
+        /// Set this lift up as one of the types from the shop. The differences
+        /// are real: a surface lift's rope hangs at head height and drags a
+        /// rider along the snow, a gondola encloses them in a cabin.
+        /// </summary>
+        public void Configure(LiftDefinition definition)
+        {
+            if (definition == null) return;
+
+            kind = definition.kind;
+            lineSpeed = definition.lineSpeed;
+            chairSpacing = definition.carrierSpacing;
+            seats = definition.seats;
+
+            switch (definition.kind)
+            {
+                case LiftKind.Surface:
+                    towerHeight = 3.6f;
+                    stationCableHeight = 3.2f;
+                    hangerLength = 1.9f;
+                    trackSpacing = 2.2f;
+                    metresPerTower = 34f;
+                    break;
+
+                case LiftKind.Gondola:
+                    towerHeight = 12f;
+                    stationCableHeight = 4.2f;
+                    hangerLength = 2.6f;
+                    trackSpacing = 5.4f;
+                    metresPerTower = 96f;
+                    break;
+
+                case LiftKind.HighSpeedChair:
+                    towerHeight = 10f;
+                    stationCableHeight = 3.6f;
+                    hangerLength = 2.1f;
+                    trackSpacing = 4.8f;
+                    metresPerTower = 78f;
+                    break;
+
+                default:
+                    towerHeight = 9f;
+                    stationCableHeight = 3.4f;
+                    hangerLength = 2.1f;
+                    trackSpacing = 4.4f;
+                    metresPerTower = 62f;
+                    break;
+            }
+
+            Build();
+        }
 
         /// <summary>Join the queue. Idempotent, so callers can be careless.</summary>
         public void Register(ILiftPassenger passenger)
@@ -190,21 +252,52 @@ namespace SnowBound.Lifts
                 tr.gameObject.hideFlags = HideFlags.DontSaveInEditor;
         }
 
-        /// <summary>Tower tops, bottom terminal first, following the piste edge.</summary>
+        /// <summary>Straight-line distance between the two stations, on the flat.</summary>
+        public float LineLength { get { return Vector2.Distance(bottomStation, topStation); } }
+
+        /// <summary>Metres of climb from the bottom station to the top one.</summary>
+        public float VerticalRise
+        {
+            get
+            {
+                if (mountain == null) mountain = MountainGenerator.Instance;
+                if (mountain == null) return 0f;
+
+                return Mathf.Max(0f, mountain.SampleHeight(topStation.x, topStation.y)
+                                   - mountain.SampleHeight(bottomStation.x, bottomStation.y));
+            }
+        }
+
+        /// <summary>Seconds from the bottom station to the top one.</summary>
+        public float RideSeconds { get { return lineSpeed > 0.1f ? LineLength / lineSpeed : 0f; } }
+
+        /// <summary>Move the lift onto a new line and rebuild it there.</summary>
+        public void Place(Vector3 bottom, Vector3 top)
+        {
+            bottomStation = new Vector2(bottom.x, bottom.z);
+            topStation = new Vector2(top.x, top.z);
+            Build();
+        }
+
+        /// <summary>
+        /// Tower tops, bottom terminal first. A tower stands where the ground
+        /// is, so the cable keeps an even height over whatever it crosses.
+        /// </summary>
         List<Vector3> LayOutLine()
         {
             var line = new List<Vector3>();
-            int count = Mathf.Max(2, towerCount);
+
+            int count = Mathf.Max(3, Mathf.RoundToInt(LineLength / Mathf.Max(20f, metresPerTower)) + 1);
+            towerCount = count;
 
             for (int i = 0; i < count; i++)
             {
                 float t = i / (float)(count - 1);
-                float z = Mathf.Lerp(bottomZ, topZ, t);
-                float x = mountain.PisteCenterX(z) + mountain.PisteHalfWidth(z) - edgeInset;
-                float ground = mountain.SampleHeight(x, z);
+                Vector2 flat = Vector2.Lerp(bottomStation, topStation, t);
+                float ground = mountain.SampleHeight(flat.x, flat.y);
 
                 bool terminal = i == 0 || i == count - 1;
-                line.Add(new Vector3(x, ground + (terminal ? stationCableHeight : towerHeight), z));
+                line.Add(new Vector3(flat.x, ground + (terminal ? stationCableHeight : towerHeight), flat.y));
             }
 
             return line;
@@ -305,16 +398,17 @@ namespace SnowBound.Lifts
             int count = Mathf.Max(2, Mathf.RoundToInt(_path.Length / Mathf.Max(4f, chairSpacing)));
             float spacing = _path.Length / count;
 
-            var chairs = new GameObject("Chairs");
+            var chairs = new GameObject("Carriers");
             chairs.transform.SetParent(root, false);
 
             for (int i = 0; i < count; i++)
             {
-                var go = new GameObject("Chair");
+                var go = new GameObject(Towed ? "Bar" : kind == LiftKind.Gondola ? "Cabin" : "Chair");
                 go.transform.SetParent(chairs.transform, false);
 
                 var chair = go.AddComponent<ChairliftChair>();
                 chair.loopOffset = i * spacing;
+                chair.towed = Towed;
 
                 float seatY = -hangerLength;
 
@@ -322,25 +416,74 @@ namespace SnowBound.Lifts
                       new Vector3(0f, seatY * 0.5f, 0f),
                       new Vector3(0.13f, hangerLength, 0.13f), steel, false, true);
 
-                Piece(go.transform, PrimitiveType.Cube, "Seat",
-                      new Vector3(0f, seatY, 0.02f),
-                      new Vector3(1.55f, 0.12f, 0.6f), chairMat, false, true);
-
-                Piece(go.transform, PrimitiveType.Cube, "Backrest",
-                      new Vector3(0f, seatY + 0.44f, -0.3f),
-                      new Vector3(1.55f, 0.8f, 0.1f), chairMat, false, true);
-
-                Piece(go.transform, PrimitiveType.Cube, "SafetyBar",
-                      new Vector3(0f, seatY + 0.62f, 0.42f),
-                      new Vector3(1.5f, 0.09f, 0.09f), steel, false, true);
+                switch (kind)
+                {
+                    case LiftKind.Surface: BuildBar(go.transform, seatY, steel); break;
+                    case LiftKind.Gondola: BuildCabin(go.transform, seatY, chairMat, steel); break;
+                    default: BuildSeat(go.transform, seatY, chairMat, steel); break;
+                }
 
                 var seat = new GameObject("Seat Point");
                 seat.transform.SetParent(go.transform, false);
-                seat.transform.localPosition = new Vector3(0f, seatY + 0.06f, 0.02f);
+                seat.transform.localPosition = SeatPoint(seatY);
                 chair.seat = seat.transform;
 
                 _chairs.Add(chair);
             }
+        }
+
+        Vector3 SeatPoint(float seatY)
+        {
+            if (Towed) return new Vector3(0f, seatY - 0.35f, -0.2f);
+            if (kind == LiftKind.Gondola) return new Vector3(0f, seatY - 0.55f, 0f);
+
+            return new Vector3(0f, seatY + 0.06f, 0.02f);
+        }
+
+        /// <summary>A T-bar: a short crossbar on the end of the rope, and no seat.</summary>
+        void BuildBar(Transform go, float seatY, Material steel)
+        {
+            Piece(go, PrimitiveType.Cube, "Bar",
+                  new Vector3(0f, seatY, -0.2f),
+                  new Vector3(0.9f, 0.09f, 0.09f), steel, false, true);
+
+            Piece(go, PrimitiveType.Cube, "Stem",
+                  new Vector3(0f, seatY + 0.22f, -0.2f),
+                  new Vector3(0.07f, 0.44f, 0.07f), steel, false, true);
+        }
+
+        /// <summary>A bench wide enough for however many the lift seats.</summary>
+        void BuildSeat(Transform go, float seatY, Material chairMat, Material steel)
+        {
+            float wide = Mathf.Clamp(0.42f * Mathf.Max(2, seats), 1.2f, 3.4f);
+
+            Piece(go, PrimitiveType.Cube, "Seat",
+                  new Vector3(0f, seatY, 0.02f),
+                  new Vector3(wide, 0.12f, 0.6f), chairMat, false, true);
+
+            Piece(go, PrimitiveType.Cube, "Backrest",
+                  new Vector3(0f, seatY + 0.44f, -0.3f),
+                  new Vector3(wide, 0.8f, 0.1f), chairMat, false, true);
+
+            Piece(go, PrimitiveType.Cube, "SafetyBar",
+                  new Vector3(0f, seatY + 0.62f, 0.42f),
+                  new Vector3(wide - 0.05f, 0.09f, 0.09f), steel, false, true);
+        }
+
+        /// <summary>An enclosed cabin. The point of a gondola is the weather stays outside.</summary>
+        void BuildCabin(Transform go, float seatY, Material chairMat, Material steel)
+        {
+            Piece(go, PrimitiveType.Cube, "CabinShell",
+                  new Vector3(0f, seatY - 0.9f, 0f),
+                  new Vector3(1.5f, 2.0f, 1.5f), chairMat, false, true);
+
+            Piece(go, PrimitiveType.Cube, "CabinRoof",
+                  new Vector3(0f, seatY + 0.12f, 0f),
+                  new Vector3(1.7f, 0.16f, 1.7f), steel, false, true);
+
+            Piece(go, PrimitiveType.Cube, "CabinFloor",
+                  new Vector3(0f, seatY - 1.92f, 0f),
+                  new Vector3(1.6f, 0.12f, 1.6f), steel, false, true);
         }
 
         /// <summary>Rotation whose local X runs across the line and local Z along it.</summary>
@@ -401,6 +544,15 @@ namespace SnowBound.Lifts
                 chair.transform.position = point;
                 if (tangent.sqrMagnitude > 0.0001f)
                     chair.transform.rotation = Quaternion.LookRotation(tangent.normalized, Vector3.up);
+
+                if (!Towed || chair.seat == null) continue;
+
+                // A surface lift does not lift. The bar goes round on the rope
+                // and the rider stays on the snow underneath it, which is the
+                // whole difference between a drag lift and a chair.
+                Vector3 seat = chair.seat.position;
+                seat.y = mountain.SampleHeight(seat.x, seat.z) + 0.95f;
+                chair.seat.position = seat;
             }
         }
 
@@ -475,24 +627,69 @@ namespace SnowBound.Lifts
         {
             Vector3 cable = _path.Sample(_unloadS);
 
-            // Step off towards the middle of the run, not off the side of it.
-            float centre = mountain.PisteCenterX(cable.z);
-            float towards = Mathf.Sign(centre - cable.x);
+            // Step off to the side of the line, onto the nearest run if there
+            // is one within reach, and otherwise just clear of the cable.
+            Vector3 spot = UnloadSpot(cable);
 
-            Vector3 spot = new Vector3(cable.x + towards * 5f, 0f, cable.z);
-            spot.y = mountain.SampleHeight(spot.x, spot.z) + 0.4f;
-
-            // Face the way the run goes, so you are already pointed downhill.
-            Vector3 facing = mountain.PistePoint(spot.z - 30f) - spot;
-            facing.y = 0f;
-            if (facing.sqrMagnitude < 0.0001f) facing = Vector3.back;
-            facing.Normalize();
+            // Face downhill. Off a run that is the fall line; on one it is the
+            // way the run goes, which is not always the same thing.
+            Vector3 facing = Downhill(spot);
 
             ILiftPassenger passenger = chair.occupant;
             chair.occupant = null;
 
             if (passenger != null && passenger.Transform != null)
                 passenger.LeaveLift(spot, facing, facing * 3f);
+        }
+
+        Vector3 UnloadSpot(Vector3 cable)
+        {
+            Vector3 spot = cable;
+
+            Trail run = mountain.TrailUnder(cable.x, cable.z, 40f);
+            if (run != null)
+            {
+                float along;
+                run.DistanceTo(cable.x, cable.z, out along);
+
+                Vector3 centre = run.PointAt(along);
+                Vector3 towards = centre - cable;
+                towards.y = 0f;
+
+                if (towards.sqrMagnitude > 0.01f)
+                    spot = cable + towards.normalized * Mathf.Min(towards.magnitude, 6f);
+            }
+            else
+            {
+                spot = cable + Vector3.right * 5f;
+            }
+
+            spot = mountain.ClampToWorld(spot, 8f);
+            spot.y = mountain.SampleHeight(spot.x, spot.z) + 0.4f;
+
+            return spot;
+        }
+
+        /// <summary>Which way is down from here, flattened.</summary>
+        Vector3 Downhill(Vector3 at)
+        {
+            Trail run = mountain.TrailUnder(at.x, at.z, 25f);
+
+            if (run != null)
+            {
+                float along;
+                run.DistanceTo(at.x, at.z, out along);
+
+                Vector3 ahead = run.PointAt(Mathf.Min(1f, along + 0.06f)) - at;
+                ahead.y = 0f;
+                if (ahead.sqrMagnitude > 0.01f) return ahead.normalized;
+            }
+
+            Vector3 normal = mountain.SampleNormal(at.x, at.z);
+            Vector3 fall = Vector3.ProjectOnPlane(Vector3.down, normal);
+            fall.y = 0f;
+
+            return fall.sqrMagnitude < 0.0001f ? Vector3.back : fall.normalized;
         }
 
         static Vector3 Flat(Vector3 v)
