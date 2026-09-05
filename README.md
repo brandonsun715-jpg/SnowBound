@@ -1,7 +1,7 @@
 # SnowBound
 
 A stylised-realistic ski / snowboard resort game made in Unity.
-
+This is a solo project made by a highschool student with Claude.
 - **Unity version:** Unity 6 (developed on 6000.5.11f1)
 - **Render pipeline:** URP (Universal Render Pipeline)
 
