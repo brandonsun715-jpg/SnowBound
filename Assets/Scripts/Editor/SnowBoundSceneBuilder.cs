@@ -229,8 +229,11 @@ namespace SnowBound.EditorTools
             go.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
             go.AddComponent<GearRack>().Build();
             go.AddComponent<RunTimer>().Build();
-            go.AddComponent<GameHud>();
-            go.AddComponent<ResortHud>();
+            go.AddComponent<SkiHud>();
+            go.AddComponent<NotificationStack>();
+            go.AddComponent<ManagementScreen>();
+            go.AddComponent<DaySummary>();
+            go.AddComponent<HudDirector>();
         }
 
         /// <summary>
@@ -243,8 +246,10 @@ namespace SnowBound.EditorTools
 
             var go = new GameObject("Resort");
             go.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+            go.AddComponent<ResortIdentity>();
             go.AddComponent<ResortClock>();
             go.AddComponent<Ledger>();
+            go.AddComponent<ResortRating>();
             go.AddComponent<ResortTraffic>();
 
             var lift = Object.FindAnyObjectByType<Chairlift>();
@@ -253,8 +258,8 @@ namespace SnowBound.EditorTools
                 var facility = lift.gameObject.AddComponent<LiftFacility>();
                 facility.displayName = "Chairlift";
                 facility.lift = lift;
-                facility.baseDailyUpkeep = 7000f;
-                facility.upkeepPerLevel = 2600f;
+                facility.baseDailyUpkeep = 3200f;
+                facility.upkeepPerLevel = 2400f;
                 facility.baseQuality = 0.42f;
                 facility.qualityPerLevel = 0.20f;
                 facility.baseUpgradeCost = 14000f;
@@ -266,8 +271,8 @@ namespace SnowBound.EditorTools
             {
                 var facility = lodge.gameObject.AddComponent<LodgeFacility>();
                 facility.displayName = "Lodge";
-                facility.baseDailyUpkeep = 4200f;
-                facility.upkeepPerLevel = 2100f;
+                facility.baseDailyUpkeep = 2100f;
+                facility.upkeepPerLevel = 1800f;
                 facility.baseQuality = 0.50f;
                 facility.qualityPerLevel = 0.18f;
                 facility.baseUpgradeCost = 9000f;
@@ -280,8 +285,8 @@ namespace SnowBound.EditorTools
                 var facility = park.gameObject.AddComponent<ParkFacility>();
                 facility.displayName = "Terrain Park";
                 facility.park = park;
-                facility.baseDailyUpkeep = 2400f;
-                facility.upkeepPerLevel = 1500f;
+                facility.baseDailyUpkeep = 1000f;
+                facility.upkeepPerLevel = 900f;
                 facility.baseQuality = 0.35f;
                 facility.qualityPerLevel = 0.22f;
                 facility.baseUpgradeCost = 6000f;

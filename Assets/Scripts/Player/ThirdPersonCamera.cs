@@ -49,7 +49,8 @@ namespace SnowBound.Player
         public LayerMask collisionMask = ~0;
 
         [Header("Cursor")]
-        public bool lockCursor = true;
+        [Tooltip("Off: HudDirector owns the cursor, so nothing fights over it.")]
+        public bool lockCursor = false;
 
         float _yaw;
         float _pitch;

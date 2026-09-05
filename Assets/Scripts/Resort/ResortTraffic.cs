@@ -56,8 +56,24 @@ namespace SnowBound.Resort
         Facility[] _facilities;
         LodgeFacility _lodge;
         ParkFacility _park;
+        ResortRating _ratingSource;
         float _pendingArrivals;
+        float _lastChargedHour;
         int _countedDay;
+
+        public float DailyUpkeep
+        {
+            get
+            {
+                if (_facilities == null) return 0f;
+
+                float total = 0f;
+                for (int i = 0; i < _facilities.Length; i++)
+                    if (_facilities[i] != null) total += _facilities[i].DailyUpkeep;
+
+                return total;
+            }
+        }
 
         void Start()
         {
@@ -68,6 +84,9 @@ namespace SnowBound.Resort
             _facilities = FindObjectsByType<Facility>(FindObjectsSortMode.None);
             _lodge = FindAnyObjectByType<LodgeFacility>();
             _park = FindAnyObjectByType<ParkFacility>();
+            _ratingSource = ResortRating.Instance;
+
+            if (clock != null) _lastChargedHour = clock.opensAt;
         }
 
         void Update()
@@ -79,32 +98,34 @@ namespace SnowBound.Resort
                 _countedDay = clock.Day;
                 GuestsToday = 0;
                 _pendingArrivals = 0f;
+                _lastChargedHour = clock.opensAt;
             }
+
+            if (_ratingSource != null) rating = _ratingSource.Stars;
 
             if (clock.Closed) { GuestsPerHour = 0f; return; }
 
-            float dt = Time.deltaTime;
-            ChargeUpkeep(dt);
-            AdmitGuests(dt);
+            ChargeUpkeep();
+            AdmitGuests(Time.deltaTime);
         }
 
         /// <summary>
-        /// Running costs are charged by the second rather than in a lump, so
-        /// the cash figure moves all day instead of falling off a cliff at
-        /// five o'clock.
+        /// Costs are billed once an hour rather than every frame. Charging
+        /// continuously is technically the same money, but it reads as a
+        /// constant bleed with takings occasionally interrupting it, which is
+        /// exactly backwards from how running a business feels.
         /// </summary>
-        void ChargeUpkeep(float dt)
+        void ChargeUpkeep()
         {
             if (_facilities == null || _facilities.Length == 0) return;
 
-            float daily = 0f;
-            for (int i = 0; i < _facilities.Length; i++)
-            {
-                if (_facilities[i] != null) daily += _facilities[i].DailyUpkeep;
-            }
+            int hours = Mathf.FloorToInt(clock.Hour - _lastChargedHour);
+            if (hours < 1) return;
 
-            float dayLength = Mathf.Max(10f, clock.dayLengthMinutes * 60f);
-            ledger.Charge(LedgerLine.Maintenance, daily / dayLength * dt);
+            _lastChargedHour += hours;
+
+            float openHours = Mathf.Max(1f, clock.closesAt - clock.opensAt);
+            ledger.Charge(LedgerLine.Maintenance, DailyUpkeep / openHours * hours);
         }
 
         void AdmitGuests(float dt)

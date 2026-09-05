@@ -333,6 +333,29 @@ namespace SnowBound.Mountain
 
         public Vector3 PistePoint(float z) { return PistePoint(0, z); }
 
+        /// <summary>Skiable length of a run, following its centre line.</summary>
+        public float PisteLength(int index)
+        {
+            const int steps = 60;
+            float total = 0f;
+            Vector3 previous = PistePoint(index, 0f);
+
+            for (int i = 1; i <= steps; i++)
+            {
+                Vector3 point = PistePoint(index, length * i / (float)steps);
+                total += Vector3.Distance(previous, point);
+                previous = point;
+            }
+
+            return total;
+        }
+
+        /// <summary>Vertical drop from the top of a run to the bottom.</summary>
+        public float PisteVertical(int index)
+        {
+            return Mathf.Max(0f, PistePoint(index, length).y - PistePoint(index, 0f).y);
+        }
+
         // ---------------- mesh building ----------------------------------
 
         [ContextMenu("Build Now")]

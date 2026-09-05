@@ -30,7 +30,8 @@ Assets/
     Resort/               the tycoon layer: clock, money, facilities, demand
     Weather/              sky, snowfall, snow conditions
     Audio/                what the ride and the lift sound like
-    UI/                   heads-up display
+    UI/                   the interface
+      Theme/              the design system: colours, sprites, icons, motion
     Player/               character, locomotion modes, input, camera
     Mountain/             terrain generation and scene dressing
     Lifts/                chairlift
@@ -72,7 +73,7 @@ Milestone 2 is complete.
 
 1. **Economy** — cash, a resort day, revenue, upkeep, end-of-day figures. *(done)*
 2. Guests: NPCs who arrive, buy tickets, ride, ski and leave.
-3. Resort rating out of five.
+3. **Resort rating** out of five, from weighted factors. *(done)*
 4. Building system: place a lodge, rental, restaurant, shop, ticket booth.
 5. Upgrade system for the lift, lodge, trails and park.
 
@@ -114,6 +115,7 @@ props after changing generator settings.
 | Scroll wheel | Zoom in / out |
 | `1` / `2` / `3` | Walk / ski / snowboard, **at the lodge gear rack only** |
 | `V` | Step the weather on (clear, snow, storm) |
+| `Tab` | Open and close the resort dashboard |
 | `Esc` | Release the mouse cursor (in the editor) |
 
 ## The loop
@@ -135,6 +137,25 @@ A day runs 08:00 to 17:00 in about seven real minutes. Guests arrive across
 it on a curve, upkeep is charged by the second, and at closing the books are
 read back and the next morning begins. There is no night: a night is time
 the player cannot do anything with.
+
+## Interface
+
+One design system, in `UI/Theme`. Dark translucent glass, a hairline border
+and a lit top edge on every panel; icy blue as an accent and never as a
+background, because the mountain supplies the colour.
+
+Rounded corners, borders and icons are all rasterised from distance fields
+at runtime, so the interface needs no imported art either. Stars are drawn
+rather than typed, because star characters are missing from many fonts and a
+rating that renders as five empty boxes is not a rating.
+
+`HudDirector` decides which interface is up. Exactly one of the riding HUD
+and the resort dashboard is visible at a time, and the day's figures outrank
+both. It is also the only script that touches the cursor.
+
+Buttons hit-test themselves rather than going through Unity's EventSystem,
+which needs an input module matched to whichever input backend the project
+was created with; picking the wrong one leaves every button silently dead.
 
 ## Notes
 

@@ -20,28 +20,30 @@ namespace SnowBound.Player
         public bool enableInput = true;
         [Tooltip("Looking around. Stays on while riding, because the view is\nhalf the point of a chairlift.")]
         public bool enableLook = true;
+        [Tooltip("Held by the interface while a screen is open. Kept separate from\nthe gameplay flags so the two can never fight over them.")]
+        public bool suspended;
 
         /// <summary>x = left/right, y = forward/back. Length never exceeds 1.</summary>
         public Vector2 Move
         {
             get
             {
-                if (!enableInput) return Vector2.zero;
+                if (!enableInput || suspended) return Vector2.zero;
                 Vector2 v = ReadMove();
                 return v.sqrMagnitude > 1f ? v.normalized : v;
             }
         }
 
         /// <summary>Mouse movement, already normalised so both backends feel the same.</summary>
-        public Vector2 Look => enableLook ? ReadLook() : Vector2.zero;
+        public Vector2 Look => enableLook && !suspended ? ReadLook() : Vector2.zero;
 
-        public float Zoom => enableLook ? ReadZoom() : 0f;
-        public bool JumpPressed => enableInput && ReadJump();
-        public bool SprintHeld => enableInput && ReadSprint();
-        public bool BrakeHeld => enableInput && ReadBrake();
+        public float Zoom => enableLook && !suspended ? ReadZoom() : 0f;
+        public bool JumpPressed => enableInput && !suspended && ReadJump();
+        public bool SprintHeld => enableInput && !suspended && ReadSprint();
+        public bool BrakeHeld => enableInput && !suspended && ReadBrake();
 
         /// <summary>1 = walk, 2 = ski, 3 = snowboard. -1 when nothing pressed.</summary>
-        public int GearPressed => enableInput ? ReadGear() : -1;
+        public int GearPressed => enableInput && !suspended ? ReadGear() : -1;
 
         /// <summary>V steps the weather on. Works while riding the lift too.</summary>
         public bool WeatherPressed => ReadWeather();
@@ -49,6 +51,9 @@ namespace SnowBound.Player
         /// <summary>Dismisses whatever is waiting on the player. Never gated,
         /// because it is what un-gates everything else.</summary>
         public bool ContinuePressed => ReadContinue();
+
+        /// <summary>Opens and closes the resort dashboard. Never gated.</summary>
+        public bool ManagementPressed => ReadManagement();
 
 #if ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
 
@@ -115,6 +120,12 @@ namespace SnowBound.Player
             return k.spaceKey.wasPressedThisFrame || k.enterKey.wasPressedThisFrame;
         }
 
+        static bool ReadManagement()
+        {
+            var k = Keyboard.current;
+            return k != null && k.tabKey.wasPressedThisFrame;
+        }
+
 #else
 
         static Vector2 ReadMove()
@@ -146,6 +157,8 @@ namespace SnowBound.Player
         {
             return Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return);
         }
+
+        static bool ReadManagement() { return Input.GetKeyDown(KeyCode.Tab); }
 
 #endif
     }

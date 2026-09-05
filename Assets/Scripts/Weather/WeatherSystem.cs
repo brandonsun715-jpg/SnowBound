@@ -96,6 +96,12 @@ namespace SnowBound.Weather
             }
         }
 
+        /// <summary>Degrees celsius. Colder in a storm, colder again at altitude.</summary>
+        public float TemperatureC
+        {
+            get { return Mathf.Lerp(-2.5f, -11f, storminess); }
+        }
+
         public float DragMultiplier { get { return Mathf.Lerp(1f, powderDrag, powder); } }
         public float GripMultiplier { get { return Mathf.Lerp(1f, powderGrip, powder); } }
         public float SprayMultiplier { get { return Mathf.Lerp(hardpackSpray, powderSpray, powder); } }
