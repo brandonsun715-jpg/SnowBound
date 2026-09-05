@@ -4,154 +4,179 @@ using SnowBound.Mountain;
 namespace SnowBound.Game
 {
     /// <summary>
-    /// The owner's view: an angled camera orbiting a point on the mountain.
+    /// The owner's view: a camera you fly.
     ///
-    /// Never straight down. A ski resort is elevation, and a top-down view
-    /// throws away the one thing that makes the place legible — which way the
-    /// hill falls. So the pitch flattens as you zoom in, and even at maximum
-    /// height the camera stays well off vertical.
+    /// WASD moves it about the mountain, holding a mouse button looks around,
+    /// and the wheel takes it up and down. It is not an orbit rig round a
+    /// focus point, because planning a resort means going and looking at
+    /// things — under the trees, along a ridge, up the line a lift would take
+    /// — and an orbit camera can only ever look at the middle of the map.
     ///
-    /// It holds a focus point, a distance and a heading, and everything is
-    /// eased towards a target rather than set, so nothing ever snaps.
+    /// It will not go below the snow or outside the resort, and it will not
+    /// look straight down: a ski hill is elevation, and looking down the
+    /// vertical axis throws away the one thing that makes the place legible.
     /// </summary>
     public class ManagementCamera : MonoBehaviour
     {
         public MountainGenerator mountain;
 
-        [Header("Zoom")]
-        public float minZoom = 38f;
-        public float maxZoom = 780f;
-        public float zoomSpeed = 900f;
-        public float startZoom = 320f;
+        [Header("Flying")]
+        [Tooltip("Metres per second at ground level. Faster the higher you are.")]
+        public float moveSpeed = 46f;
+        [Tooltip("Multiplier while shift is held.")]
+        public float sprint = 3.2f;
+        [Tooltip("Metres per second straight up, on the wheel or Q and E.")]
+        public float liftSpeed = 42f;
 
-        [Header("Angle")]
-        [Tooltip("Degrees below horizontal when zoomed right in.")]
-        public float pitchClose = 24f;
-        [Tooltip("Degrees below horizontal when zoomed right out. Never ninety.")]
-        public float pitchFar = 52f;
-        public float startYaw = 180f;
-        public float rotateSpeed = 4.2f;
+        [Header("Looking")]
+        public float lookSpeed = 3.4f;
+        [Tooltip("Furthest the camera will tip down. Never quite vertical.")]
+        public float maxPitch = 78f;
+        public float minPitch = -30f;
 
-        [Header("Panning")]
-        [Tooltip("Metres per second at the closest zoom. Scales up as you pull back.")]
-        public float panSpeed = 26f;
-        public float edgeMargin = 40f;
+        [Header("Height")]
+        [Tooltip("Closest the camera comes to the snow.")]
+        public float minHeightAboveGround = 8f;
+        public float maxHeightAboveGround = 900f;
+        public float startHeight = 190f;
+        public float edgeMargin = 30f;
 
         [Header("Feel")]
-        public float focusSmoothing = 9f;
-        public float zoomSmoothing = 7f;
-        public float yawSmoothing = 10f;
+        public float moveSmoothing = 12f;
+        public float lookSmoothing = 18f;
         public float fieldOfView = 55f;
 
-        Vector3 _focus, _targetFocus;
-        float _zoom, _targetZoom;
-        float _yaw, _targetYaw;
         Camera _camera;
+
+        Vector3 _position, _targetPosition;
+        float _yaw, _targetYaw;
+        float _pitch, _targetPitch;
 
         void Awake()
         {
             _camera = GetComponent<Camera>();
             if (mountain == null) mountain = MountainGenerator.Instance;
 
-            _targetZoom = _zoom = startZoom;
-            _targetYaw = _yaw = startYaw;
+            // Yaw zero looks up the mountain. A new resort should open on the
+            // ground it has to develop, not on the car park.
+            _targetYaw = _yaw = 0f;
+            _targetPitch = _pitch = 28f;
 
-            _targetFocus = _focus = GroundedFocus(DefaultFocus());
+            Vector3 start = DefaultPosition();
+            start.y = GroundHeight(start) + startHeight;
+
+            _targetPosition = _position = Settle(start);
         }
 
-        Vector3 DefaultFocus()
+        Vector3 DefaultPosition()
         {
-            if (mountain == null) return Vector3.zero;
-            return new Vector3(0f, 0f, mountain.length * 0.42f);
+            if (mountain == null) return new Vector3(0f, startHeight, 0f);
+
+            // Looking up the hill from just below the base area, so the first
+            // thing a new resort shows you is the mountain you get to develop.
+            return new Vector3(0f, 0f, mountain.length * 0.08f);
         }
 
-        /// <summary>Point the camera at a place in the world without a jump cut.</summary>
-        public void FocusOn(Vector3 worldPoint, float zoom = -1f)
+        // ---------------- other systems ------------------------------------
+
+        /// <summary>Fly to a place in the world. Keeps whatever heading you had.</summary>
+        public void FocusOn(Vector3 worldPoint, float distance = -1f)
         {
-            _targetFocus = GroundedFocus(worldPoint);
-            if (zoom > 0f) _targetZoom = Mathf.Clamp(zoom, minZoom, maxZoom);
+            float back = distance > 0f ? distance : 120f;
+
+            Quaternion facing = Quaternion.Euler(_targetPitch, _targetYaw, 0f);
+            _targetPosition = Settle(worldPoint - facing * Vector3.forward * back);
         }
 
-        public void SnapTo(Vector3 worldPoint, float zoom, float yaw)
+        public void SnapTo(Vector3 worldPoint, float distance, float yaw)
         {
-            _targetFocus = _focus = GroundedFocus(worldPoint);
-            _targetZoom = _zoom = Mathf.Clamp(zoom, minZoom, maxZoom);
             _targetYaw = _yaw = yaw;
-        }
+            _targetPitch = _pitch = 34f;
 
-        void LateUpdate()
-        {
-            float dt = Time.unscaledDeltaTime;
-
-            ReadInput(dt);
-            Settle(dt);
-
-            Vector3 position;
-            Quaternion rotation;
-            float fov;
-            ComputePose(out position, out rotation, out fov);
-
-            transform.SetPositionAndRotation(position, rotation);
-            if (_camera != null) _camera.fieldOfView = fov;
-        }
-
-        void ReadInput(float dt)
-        {
-            _targetZoom = Mathf.Clamp(_targetZoom - ManagementInput.Zoom * zoomSpeed, minZoom, maxZoom);
-
-            if (ManagementInput.RotateHeld)
-                _targetYaw += ManagementInput.MouseDelta.x * rotateSpeed;
-
-            Vector2 pan = ManagementInput.Pan;
-            if (pan.sqrMagnitude < 0.0001f) return;
-
-            // Pan in the direction the camera is facing, and faster the
-            // further out you are, so crossing the resort always feels the
-            // same however close you were looking.
-            Quaternion flat = Quaternion.Euler(0f, _yaw, 0f);
-            Vector3 move = flat * new Vector3(pan.x, 0f, pan.y);
-
-            float scale = panSpeed * Mathf.Lerp(1f, 5.5f, Mathf.InverseLerp(minZoom, maxZoom, _zoom));
-            _targetFocus += move * scale * dt;
-            _targetFocus = GroundedFocus(_targetFocus);
-        }
-
-        void Settle(float dt)
-        {
-            _focus = Vector3.Lerp(_focus, _targetFocus, 1f - Mathf.Exp(-focusSmoothing * dt));
-            _zoom = Mathf.Lerp(_zoom, _targetZoom, 1f - Mathf.Exp(-zoomSmoothing * dt));
-            _yaw = Mathf.LerpAngle(_yaw, _targetYaw, 1f - Mathf.Exp(-yawSmoothing * dt));
-
-            _focus.y = GroundHeight(_focus.x, _focus.z);
+            Quaternion facing = Quaternion.Euler(_pitch, _yaw, 0f);
+            _targetPosition = _position = Settle(worldPoint - facing * Vector3.forward * distance);
         }
 
         /// <summary>Where the camera wants to be, without moving it.</summary>
         public void ComputePose(out Vector3 position, out Quaternion rotation, out float fov)
         {
-            float closeness = Mathf.InverseLerp(minZoom, maxZoom, _zoom);
-            float pitch = Mathf.Lerp(pitchClose, pitchFar, closeness);
-
-            rotation = Quaternion.Euler(pitch, _yaw, 0f);
-            position = _focus - rotation * Vector3.forward * _zoom;
+            position = _position;
+            rotation = Quaternion.Euler(_pitch, _yaw, 0f);
             fov = fieldOfView;
         }
 
-        Vector3 GroundedFocus(Vector3 point)
+        // ---------------- running ------------------------------------------
+
+        void LateUpdate()
+        {
+            float dt = Time.unscaledDeltaTime;
+
+            Look(dt);
+            Fly(dt);
+
+            _position = Vector3.Lerp(_position, _targetPosition, 1f - Mathf.Exp(-moveSmoothing * dt));
+            _yaw = Mathf.LerpAngle(_yaw, _targetYaw, 1f - Mathf.Exp(-lookSmoothing * dt));
+            _pitch = Mathf.Lerp(_pitch, _targetPitch, 1f - Mathf.Exp(-lookSmoothing * dt));
+
+            transform.SetPositionAndRotation(_position, Quaternion.Euler(_pitch, _yaw, 0f));
+            if (_camera != null) _camera.fieldOfView = fieldOfView;
+        }
+
+        void Look(float dt)
+        {
+            if (!ManagementInput.LookHeld) return;
+
+            Vector2 delta = ManagementInput.MouseDelta;
+
+            _targetYaw += delta.x * lookSpeed;
+            _targetPitch = Mathf.Clamp(_targetPitch - delta.y * lookSpeed, minPitch, maxPitch);
+        }
+
+        void Fly(float dt)
+        {
+            Vector2 pan = ManagementInput.Pan;
+            float lift = ManagementInput.Lift;
+
+            if (pan.sqrMagnitude < 0.0001f && Mathf.Abs(lift) < 0.0001f) return;
+
+            // Forward is where you are looking, flattened. Looking down and
+            // pressing W should take you further down the hill, not into it.
+            Quaternion flat = Quaternion.Euler(0f, _yaw, 0f);
+            Vector3 move = flat * new Vector3(pan.x, 0f, pan.y);
+
+            // Higher up means bigger strides, so crossing the resort takes the
+            // same time whether you are inspecting a lift or looking at the map.
+            float above = Mathf.Max(1f, _targetPosition.y - GroundHeight(_targetPosition));
+            float scale = moveSpeed * Mathf.Lerp(1f, 6f, Mathf.InverseLerp(minHeightAboveGround, 500f, above));
+
+            if (ManagementInput.Faster) scale *= sprint;
+
+            _targetPosition += move * scale * dt;
+            _targetPosition += Vector3.up * lift * liftSpeed * dt;
+            _targetPosition = Settle(_targetPosition);
+        }
+
+        /// <summary>Keep the camera inside the resort and above the snow.</summary>
+        Vector3 Settle(Vector3 point)
         {
             if (mountain != null)
             {
-                float half = mountain.width * 0.5f - edgeMargin;
+                float half = mountain.width * 0.5f + edgeMargin;
                 point.x = Mathf.Clamp(point.x, -half, half);
-                point.z = Mathf.Clamp(point.z, edgeMargin, mountain.length - edgeMargin);
+                point.z = Mathf.Clamp(point.z, -edgeMargin, mountain.length + edgeMargin);
             }
 
-            point.y = GroundHeight(point.x, point.z);
+            float ground = GroundHeight(point);
+            point.y = Mathf.Clamp(point.y,
+                                  ground + minHeightAboveGround,
+                                  ground + maxHeightAboveGround);
+
             return point;
         }
 
-        float GroundHeight(float x, float z)
+        float GroundHeight(Vector3 point)
         {
-            return mountain != null ? mountain.SampleHeight(x, z) : 0f;
+            return mountain != null ? mountain.SampleHeight(point.x, point.z) : 0f;
         }
     }
 }

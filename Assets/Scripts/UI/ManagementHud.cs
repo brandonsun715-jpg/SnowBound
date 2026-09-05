@@ -38,6 +38,9 @@ namespace SnowBound.Hud
         Text _place, _clockText, _state;
         UIStars _stars;
 
+        /// <summary>Three lines and their padding. Other panels clear this.</summary>
+        public const float ChipHeight = 86f;
+
         void Start()
         {
             if (modes == null) modes = ModeDirector.Instance;
@@ -111,22 +114,25 @@ namespace SnowBound.Hud
             RectTransform chip = UIBuilder.Glass(layer, "PlaceChip",
                                                  new Vector2(0f, 1f), new Vector2(0f, 1f),
                                                  new Vector2(UILayout.Margin, -UILayout.UnderTopBar),
-                                                 new Vector2(270f, 62f), UITheme.RadiusSmall);
+                                                 new Vector2(288f, ChipHeight), UITheme.RadiusSmall);
 
+            // All three lines are placed from the top of the chip. Mixing a
+            // top-anchored line with a bottom-anchored one is how they end up
+            // printed over each other.
             _place = UIBuilder.Label(chip, "Place", UITheme.Label, UITheme.Ink,
                                      TextAnchor.UpperLeft, FontStyle.Bold);
             UIBuilder.Place(_place.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                            new Vector2(14f, -10f), new Vector2(240f, 20f));
+                            new Vector2(14f, -12f), new Vector2(258f, 20f));
 
             _clockText = UIBuilder.Label(chip, "Clock", UITheme.Micro, UITheme.InkMuted,
                                          TextAnchor.UpperLeft);
             UIBuilder.Place(_clockText.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                            new Vector2(14f, -32f), new Vector2(240f, 18f));
+                            new Vector2(14f, -36f), new Vector2(258f, 16f));
 
             _state = UIBuilder.Label(chip, "State", UITheme.Micro, UITheme.Ice,
-                                     TextAnchor.LowerLeft);
-            UIBuilder.Place(_state.rectTransform, new Vector2(0f, 0f), new Vector2(0f, 0f),
-                            new Vector2(14f, 8f), new Vector2(240f, 16f));
+                                     TextAnchor.UpperLeft);
+            UIBuilder.Place(_state.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f),
+                            new Vector2(14f, -58f), new Vector2(258f, 16f));
         }
 
         void Overview()

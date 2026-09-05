@@ -118,10 +118,12 @@ props after changing generator settings.
 
 | Input | Action |
 |---|---|
-| `W A S D` / arrows | Pan the camera |
-| Scroll wheel | Zoom |
-| Middle mouse drag | Rotate |
+| `W A S D` / arrows | Fly the camera |
+| Hold right or middle mouse, drag | Look around |
+| Scroll wheel, or `Q` / `E` | Up and down |
+| `Shift` | Fly faster |
 | Left click | Select a lift, building, run, guest or open ground |
+| Right click, without dragging | Cancel or undo |
 | `Tab` | Resort overview: rating, facilities, upgrades |
 | BUILD / TERRAIN / TRAILS / LIFTS | The tool dock along the bottom |
 | ENTER MOUNTAIN | Fly down and take control |
@@ -142,7 +144,7 @@ props after changing generator settings.
 |---|---|
 | Pick a difficulty | Starts a new run at that shape |
 | Left click | Add a control point, summit first |
-| Right click | Undo the last point |
+| Right click (no drag) | Undo the last point |
 | `-` / `+` on WIDTH | Narrow or widen the run |
 | CONFIRM RUN | Pay for it and cut it into the mountain |
 | `Esc` | Abandon it |
@@ -154,7 +156,7 @@ props after changing generator settings.
 | Move the mouse | Position it. Green is allowed, red is not, and it says why |
 | Left click | Place it and pay. A lift takes two clicks: bottom station, then top |
 | `R` | Rotate a building by 45° |
-| `Esc` / right click | Put it back down |
+| `Esc` / right click (no drag) | Put it back down |
 
 **On foot**
 
@@ -357,12 +359,25 @@ was created with; picking the wrong one leaves every button silently dead.
   rectangle it hides a few metres under the real terrain rather than being cut
   out, which means no hole to keep in sync and no seam along the join. It has
   no colliders and casts no shadows: it is scenery.
-- If the game looks pixelated, check the **Scale** slider at the top of the
-  Game view. Anything above `1x` renders at a fraction of the resolution and
-  magnifies the result. On a Retina Mac, also turn off **Low Resolution
-  Aspect Ratios** in the same menu. `SnowBound → Improve Render Quality` sets
-  the pipeline side: full render scale, 4× MSAA and a shadow distance that
-  reaches the far side of the piste.
+- If the game looks pixelated it is almost always the **Scale** slider at the
+  top of the Game view: above `1x` it renders at a fraction of the resolution
+  and magnifies the result. `SnowBound → Fix Game View (1080p at 1x)` sets the
+  resolution, the slider and Retina's low-resolution aspect ratios for you, and
+  tells you which switch to flick by hand if the editor has moved one.
+  `SnowBound → Improve Render Quality` sets the pipeline side: full render
+  scale, 4× MSAA and a shadow distance that reaches the far side of the piste.
+- The mountain is a ridged multifractal through a warped domain, then terraced
+  through a mask. The warp is what turns round blobs into ridges that flow; the
+  terracing is what puts cliff bands and benches on some faces and leaves
+  others smooth. That contrast is the whole difference between a slope you can
+  read at a glance and a slope that looks the same at twenty-five degrees and
+  at seventy.
+- The management camera flies rather than orbits. Planning a resort means going
+  and looking at things — under the trees, along a ridge, up the line a lift
+  would take — and an orbit rig can only ever look at the middle of the map.
+- The ground a building stands on is levelled before the building is placed and
+  protected afterwards, so a lodge never ends up with daylight under one corner
+  and the player can never sculpt it there later.
 - Generated geometry uses `HideFlags.DontSave`, so the scene file stays
   small. `MountainGenerator` and `MountainProps` are `[ExecuteAlways]`, so the
   mountain rebuilds itself whenever the scene loads, scripts recompile, or you

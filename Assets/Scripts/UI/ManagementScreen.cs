@@ -48,6 +48,7 @@ namespace SnowBound.Hud
         readonly List<Card> _cards = new List<Card>();
 
         RectTransform _cardHost;
+        Text _facilitiesCaption;
         Text _pageLabel;
         UIButton _older, _newer;
         int _page;
@@ -58,6 +59,13 @@ namespace SnowBound.Hud
         const float CardWidth = 318f;
         const float CardStride = 334f;
         const float CardLeft = 500f;
+
+        /// <summary>
+        /// Top of the overview's own content. It starts below the top bar and
+        /// the place chip, both of which stay up behind it, so nothing is ever
+        /// printed over anything.
+        /// </summary>
+        const float Below = -(UILayout.UnderTopBar + ManagementHud.ChipHeight + 22f);
 
         void Start()
         {
@@ -127,14 +135,14 @@ namespace SnowBound.Hud
             Text brand = UIBuilder.Label(layer, "Brand", UITheme.Micro, UITheme.InkFaint,
                                          TextAnchor.UpperLeft);
             UIBuilder.Place(brand.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                            new Vector2(UILayout.Margin + 4f, -140f), new Vector2(600f, 18f));
+                            new Vector2(UILayout.Margin + 4f, Below - 24f), new Vector2(600f, 18f));
             brand.text = UITheme.Track(identity != null
                 ? identity.resortName.ToUpperInvariant() : "SNOWBOUND", 2);
 
             Text heading = UIBuilder.Label(layer, "Heading", UITheme.Hero, UITheme.Ink,
                                            TextAnchor.UpperLeft, FontStyle.Bold);
             UIBuilder.Place(heading.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                            new Vector2(UILayout.Margin + 2f, -162f), new Vector2(700f, 56f));
+                            new Vector2(UILayout.Margin + 2f, Below), new Vector2(700f, 56f));
             heading.text = "RESORT OVERVIEW";
         }
 
@@ -142,8 +150,8 @@ namespace SnowBound.Hud
         {
             RectTransform panel = UIBuilder.Glass(layer, "RatingPanel", new Vector2(0f, 1f),
                                                   new Vector2(0f, 1f),
-                                                  new Vector2(UILayout.Margin, -238f),
-                                                  new Vector2(430f, 460f));
+                                                  new Vector2(UILayout.Margin, Below - 72f),
+                                                  new Vector2(430f, 430f));
 
             var topLeft = new Vector2(0f, 1f);
 
@@ -168,7 +176,7 @@ namespace SnowBound.Hud
 
             for (int i = 0; i < rating.Factors.Count; i++)
             {
-                float y = -UITheme.Pad - 104f - i * 41f;
+                float y = -UITheme.Pad - 100f - i * 38f;
 
                 Text name = UIBuilder.Label(panel, "Factor" + i, UITheme.Label, UITheme.InkMuted,
                                             TextAnchor.UpperLeft);
@@ -200,15 +208,16 @@ namespace SnowBound.Hud
             Text caption = UIBuilder.Label(layer, "FacilitiesCaption", UITheme.Micro, UITheme.InkFaint,
                                            TextAnchor.UpperLeft);
             UIBuilder.Place(caption.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                            new Vector2(CardLeft, -232f), new Vector2(500f, 18f));
+                            new Vector2(CardLeft, Below - 78f), new Vector2(500f, 18f));
             caption.text = UITheme.Track("FACILITIES");
+            _facilitiesCaption = caption;
 
             _pageLabel = UIBuilder.Label(layer, "Page", UITheme.Micro, UITheme.InkFaint,
                                          TextAnchor.MiddleCenter);
             float right = CardLeft + PerPage * CardStride;
 
             UIBuilder.Place(_pageLabel.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                            new Vector2(right - 116f, -240f), new Vector2(60f, 22f));
+                            new Vector2(right - 116f, Below - 84f), new Vector2(60f, 22f));
 
             _older = Arrow(layer, "Older", right - 160f, "<", -1);
             _newer = Arrow(layer, "Newer", right - 52f, ">", 1);
@@ -218,7 +227,7 @@ namespace SnowBound.Hud
         {
             RectTransform button = UIBuilder.Place(UIBuilder.Node(layer, name),
                                                    new Vector2(0f, 1f), new Vector2(0f, 1f),
-                                                   new Vector2(x, -240f), new Vector2(40f, 26f));
+                                                   new Vector2(x, Below - 84f), new Vector2(40f, 26f));
             UIPointer.Block(button);
 
             var fill = button.gameObject.AddComponent<Image>();
@@ -305,7 +314,7 @@ namespace SnowBound.Hud
 
                 card.root.gameObject.SetActive(visible);
                 if (visible)
-                    card.root.anchoredPosition = new Vector2(CardLeft + column * CardStride, -258f);
+                    card.root.anchoredPosition = new Vector2(CardLeft + column * CardStride, Below - 100f);
             }
 
             if (_pageLabel != null) _pageLabel.text = UITheme.Track((_page + 1) + " / " + Pages);
@@ -331,7 +340,7 @@ namespace SnowBound.Hud
         {
             RectTransform card = UIBuilder.Glass(layer, facility.displayName + "Card",
                                                  new Vector2(0f, 1f), new Vector2(0f, 1f),
-                                                 new Vector2(x, -258f), new Vector2(CardWidth, 352f),
+                                                 new Vector2(x, Below - 100f), new Vector2(CardWidth, 340f),
                                                  UITheme.Radius, UITheme.Card);
             UIPointer.Block(card);
 
@@ -481,6 +490,30 @@ namespace SnowBound.Hud
                 if (_cards[i].root != null && !_cards[i].root.gameObject.activeSelf) continue;
                 RefreshCard(_cards[i]);
             }
+
+            if (_facilitiesCaption != null) _facilitiesCaption.text = UITheme.Track(Missing());
+        }
+
+        /// <summary>
+        /// A new resort owns one building, so the list looks broken unless it
+        /// says why. Naming what is missing turns an empty shelf into the next
+        /// thing to do.
+        /// </summary>
+        string Missing()
+        {
+            var mountain = SnowBound.Mountain.MountainGenerator.Instance;
+
+            if (mountain != null && mountain.TrailCount == 0)
+                return "FACILITIES  \u00b7  NO RUNS YET, CUT ONE IN THE TRAILS TAB";
+
+            if (FindAnyObjectByType<SnowBound.Lifts.Chairlift>() == null)
+                return "FACILITIES  \u00b7  NO LIFT YET, BUY ONE IN THE LIFTS TAB";
+
+            var park = FindAnyObjectByType<SnowBound.Mountain.TerrainPark>();
+            if (park != null && !park.built)
+                return "FACILITIES  \u00b7  NO TERRAIN PARK YET, BUILD ONE IN THE TRAILS TAB";
+
+            return "FACILITIES";
         }
 
         void RefreshCard(Card card)

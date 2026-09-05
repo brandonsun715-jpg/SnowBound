@@ -113,10 +113,14 @@ namespace SnowBound.Buildings
 
             var root = new GameObject(ContainerName);
             root.transform.SetParent(transform, false);
-            root.transform.localPosition = new Vector3(positionX, LowestGround(rot), positionZ);
+            // Level the ground first, then stand on it. A lodge pitched across a
+            // lumpy hillside is a lodge with daylight under one corner, and the
+            // gear rack and the arrivals area sit on this pad too.
+            var here = new Vector3(positionX, 0f, positionZ);
+            mountain.FlattenPad(here, 40f, 26f);
+            mountain.Protect(here, 40f, "Lodge");
 
-            // The ground the lodge stands on stops being the player's to move.
-            mountain.Protect(new Vector3(positionX, 0f, positionZ), 34f, "Lodge");
+            root.transform.localPosition = new Vector3(positionX, LowestGround(rot), positionZ);
             root.transform.localRotation = rot;
 
             Material stone = MaterialFactory.Create("LodgeStone", new Color(0.34f, 0.33f, 0.32f), 0.08f);

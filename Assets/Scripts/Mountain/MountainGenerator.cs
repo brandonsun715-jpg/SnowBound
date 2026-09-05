@@ -52,22 +52,35 @@ namespace SnowBound.Mountain
 
         [Header("Shape")]
         [Tooltip("How far the ground rises towards the edges of the map.")]
-        public float rimStart = 205f;
+        public float rimStart = 215f;
         public float rimEnd = 300f;
-        public float rimHeight = 96f;
-        [Tooltip("Bowls and shoulders across the mountain. This is the natural relief.")]
-        public float reliefHeight = 34f;
-        public float reliefScale = 0.0042f;
+        public float rimHeight = 120f;
+
+        [Header("Relief")]
+        [Tooltip("Height of the ridges and gullies. This is what makes it a mountain\nrather than a ramp.")]
+        public float reliefHeight = 92f;
+        [Tooltip("Size of the main landforms. Smaller number, bigger features.")]
+        public float reliefScale = 0.0030f;
+        [Tooltip("How far the landforms are bent sideways. Warping is what turns\nround blobs into ridges that flow.")]
+        public float warp = 130f;
+
+        [Header("Cliffs and benches")]
+        [Tooltip("Height of one step in a cliff band. Zero switches them off.")]
+        public float benchStep = 24f;
+        [Tooltip("How abrupt each step is. 1 is no step at all, 3 is a wall.")]
+        [Range(1f, 4f)] public float benchSharpness = 2.7f;
+        [Tooltip("How much of the mountain gets banded. The rest stays smooth.")]
+        [Range(0f, 1f)] public float benchCoverage = 0.55f;
 
         [Header("Terrain noise")]
         public float noiseScale = 0.011f;
         [Tooltip("Bumpiness of the untouched mountain.")]
-        public float roughness = 7.5f;
+        public float roughness = 5.5f;
         public int seed = 12345;
 
         [Header("Runs")]
         [Tooltip("How far outside a run its bank reaches.")]
-        public float trailFalloff = 26f;
+        public float trailFalloff = 34f;
         [Tooltip("Least grade a cut run is allowed to have, so no run ever runs uphill.")]
         public float minimumTrailGrade = 0.035f;
         public float rollerSpacing = 78f;
@@ -80,7 +93,7 @@ namespace SnowBound.Mountain
         public Material groomedMaterial;
         public Material powderMaterial;
         [Tooltip("Faces steeper than this show bare rock. A run never does.")]
-        [Range(20f, 75f)] public float rockAngle = 42f;
+        [Range(20f, 75f)] public float rockAngle = 36f;
 
         /// <summary>The runs the player has cut. Empty on a new resort.</summary>
         [System.NonSerialized] public List<Trail> trails = new List<Trail>();
@@ -237,8 +250,15 @@ namespace SnowBound.Mountain
 
         /// <summary>
         /// The mountain as nature left it: a fall line, a flat pad at either
-        /// end, walls at the edges of the map, and relief in between. No runs,
-        /// because on a new resort there are none.
+        /// end, and real landforms in between.
+        ///
+        /// The relief is a ridged multifractal through a warped domain, which
+        /// is the cheapest thing that produces ridges and gullies that flow
+        /// rather than round blobs scattered about. Then the whole surface is
+        /// terraced through a mask, which is what puts cliff bands and benches
+        /// on some faces and leaves others smooth — and that contrast is the
+        /// difference between a slope you can read at a glance and a slope
+        /// that looks the same at twenty-five degrees and seventy.
         /// </summary>
         public float BaseHeight(float x, float z)
         {
@@ -252,25 +272,134 @@ namespace SnowBound.Mountain
             float kTop = Smooth01(topPadZ - padFade, topPadZ, z);
             h = Mathf.Lerp(h, FallLine(topPadZ), kTop);
 
-            // Bowls, spurs and shoulders. This is what gives the undeveloped
-            // mountain somewhere obvious to put a run and somewhere obviously
-            // hard to.
-            float relief = Mathf.PerlinNoise((x + _rOffX) * reliefScale, (z + _rOffZ) * reliefScale);
-            float shoulder = Mathf.PerlinNoise((x + _rOffX) * reliefScale * 2.7f,
-                                               (z + _rOffZ) * reliefScale * 2.7f);
-            h += ((relief - 0.45f) * 1.7f + (shoulder - 0.5f) * 0.6f) * reliefHeight
-                 * Smooth01(bottomPadZ, bottomPadZ + padFade * 2f, z);
-
-            // The rim: the map has sides, and they climb.
+            // The rim: the map has sides, and they climb. This one applies even
+            // over the base area, so there is no way to wander off the edge.
             h += Smooth01(rimStart, rimEnd, Mathf.Abs(x)) * rimHeight;
 
-            h += Fbm(x, z, noiseScale, 3) * roughness;
+            // The landforms are faded out over the base area instead, so the
+            // lodge and the arrivals area stay on flat ground.
+            float wild = Smooth01(bottomPadZ, bottomPadZ + padFade * 1.6f, z);
+            if (wild <= 0.001f) return h;
+
+            h += (Relief(x, z) - 0.42f) * reliefHeight * wild;
+            h += Fbm(x, z, noiseScale, 3) * roughness * wild;
+
+            h = Bench(h, x, z, wild);
 
             // Berms at the front and back edge so nothing slides off the map.
             h += Smooth01(16f, 0f, z) * 26f;
             h += Smooth01(length - 10f, length, z) * 26f;
 
             return h;
+        }
+
+        /// <summary>
+        /// Ridged multifractal through a warped domain. Returns 0 to 1, with
+        /// sharp crests and rounded valleys, which is the shape erosion leaves.
+        /// </summary>
+        float Relief(float x, float z)
+        {
+            // Bend the sample point with a slower noise field first. Without
+            // this the ridges run in whatever direction the lattice does; with
+            // it they wander the way real ones do.
+            float wx = Mathf.PerlinNoise((x + _rOffX) * 0.0016f, (z + _rOffZ) * 0.0016f) - 0.5f;
+            float wz = Mathf.PerlinNoise((x + _rOffX) * 0.0016f + 13.7f,
+                                         (z + _rOffZ) * 0.0016f + 7.1f) - 0.5f;
+
+            float px = x + wx * warp;
+            float pz = z + wz * warp;
+
+            float sum = 0f, amp = 1f, freq = reliefScale, norm = 0f, weight = 1f;
+
+            for (int i = 0; i < 5; i++)
+            {
+                float n = Mathf.PerlinNoise((px + _rOffX) * freq, (pz + _rOffZ) * freq);
+
+                // Fold it: the absolute value gives a crease where it crosses
+                // the middle, and squaring sharpens the crest.
+                n = 1f - Mathf.Abs(n * 2f - 1f);
+                n *= n;
+
+                // Each octave is damped by the one above it, so detail collects
+                // on the ridges and the valleys stay smooth.
+                n *= weight;
+                weight = Mathf.Clamp01(n * 2.2f);
+
+                sum += n * amp;
+                norm += amp;
+
+                amp *= 0.5f;
+                freq *= 2.07f;
+            }
+
+            return norm > 0f ? sum / norm : 0f;
+        }
+
+        /// <summary>
+        /// Terracing: flatten the ground into benches with steep steps between
+        /// them, over the part of the mountain a mask says is banded. This is
+        /// what makes a cliff read as a cliff instead of as a steeper slope.
+        /// </summary>
+        float Bench(float h, float x, float z, float wild)
+        {
+            if (benchStep < 1f || benchCoverage <= 0.001f) return h;
+
+            float mask = Mathf.PerlinNoise((x + _nOffX) * 0.0034f + 40f,
+                                           (z + _nOffZ) * 0.0034f + 90f);
+
+            mask = Smooth01(1f - benchCoverage, 1f - benchCoverage * 0.35f, mask) * wild;
+            if (mask <= 0.001f) return h;
+
+            float t = h / benchStep;
+            float step = Mathf.Floor(t);
+            float part = t - step;
+
+            float terraced = (step + Mathf.Pow(part, benchSharpness)) * benchStep;
+
+            return Mathf.Lerp(h, terraced, mask);
+        }
+
+        /// <summary>
+        /// Level the ground over a patch and keep it level. Used where a
+        /// building has to stand: a lodge on a lumpy hillside is a lodge with
+        /// daylight under one corner.
+        /// </summary>
+        public void FlattenPad(Vector3 centre, float radius, float feather = 14f)
+        {
+            if (_h == null) Regenerate();
+            if (_h == null) return;
+
+            float level = BaseHeight(centre.x, centre.z);
+
+            int x0 = IndexX(centre.x - radius - feather);
+            int x1 = IndexX(centre.x + radius + feather);
+            int z0 = IndexZ(centre.z - radius - feather);
+            int z1 = IndexZ(centre.z + radius + feather);
+
+            for (int iz = z0; iz <= z1; iz++)
+            {
+                for (int ix = x0; ix <= x1; ix++)
+                {
+                    float x = GridX(ix);
+                    float z = GridZ(iz);
+
+                    float d = Vector2.Distance(new Vector2(x, z), new Vector2(centre.x, centre.z));
+                    float k = 1f - Smooth01(radius, radius + feather, d);
+                    if (k <= 0f) continue;
+
+                    int i = iz * _nx + ix;
+
+                    // Assignment rather than accumulation, so calling this
+                    // twice leaves the same pad rather than digging a hole.
+                    float wanted = level - BaseHeight(x, z);
+                    _sculpt[i] = Mathf.Lerp(_sculpt[i], wanted, k);
+                }
+            }
+
+            RecomputeRegion(x0 - 2, z0 - 2, x1 + 2, z1 + 2);
+            RebuildRegion(x0 - 2, z0 - 2, x1 + 2, z1 + 2);
+
+            RaiseChanged(centre, radius + feather + trailFalloff);
         }
 
         float SculptAt(float x, float z)
