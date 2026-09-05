@@ -14,6 +14,7 @@ using SnowBound.Hud;
 using SnowBound.Weather;
 using SnowBound.Audio;
 using SnowBound.Resort;
+using SnowBound.Game;
 
 namespace SnowBound.EditorTools
 {
@@ -48,6 +49,7 @@ namespace SnowBound.EditorTools
             CreateWeather();
             CreateGameRules();
             CreateResort();
+            CreateModes();
 
             Directory.CreateDirectory(SceneFolder);
             AssetDatabase.Refresh();
@@ -105,7 +107,7 @@ namespace SnowBound.EditorTools
             var props = gen.GetComponent<MountainProps>();
             if (props != null) props.Build();
 
-            var park = gen.GetComponent<TerrainPark>();
+            var park = Object.FindAnyObjectByType<TerrainPark>();
             if (park != null) park.Build();
 
             var lodge = Object.FindAnyObjectByType<LodgeBuilder>();
@@ -191,11 +193,15 @@ namespace SnowBound.EditorTools
 
             var gen = go.AddComponent<MountainGenerator>();
             var props = go.AddComponent<MountainProps>();
-            var park = go.AddComponent<TerrainPark>();
 
             gen.Build();
             props.Build();
-            park.Build();
+
+            // The park lives on its own object. Sharing the mountain's would
+            // make clicking the snow indistinguishable from clicking the park.
+            var parkObject = new GameObject("Terrain Park");
+            parkObject.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+            parkObject.AddComponent<TerrainPark>().Build();
         }
 
         static void CreateChairlift()
@@ -236,6 +242,20 @@ namespace SnowBound.EditorTools
             if (lodge != null) go.transform.position = lodge.EntrancePosition + Vector3.up * 0.3f;
         }
 
+        /// <summary>
+        /// The mode system goes in last, because it needs the cameras, the
+        /// player and the mountain to already exist.
+        /// </summary>
+        static void CreateModes()
+        {
+            if (Object.FindAnyObjectByType<ModeDirector>() != null) return;
+
+            var go = new GameObject("Modes");
+            go.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+            go.AddComponent<SelectionController>();
+            go.AddComponent<ModeDirector>();
+        }
+
         static void CreateWeather()
         {
             if (Object.FindAnyObjectByType<WeatherSystem>() != null) return;
@@ -267,6 +287,8 @@ namespace SnowBound.EditorTools
             go.AddComponent<SkiHud>();
             go.AddComponent<NotificationStack>();
             go.AddComponent<ManagementScreen>();
+            go.AddComponent<ManagementHud>();
+            go.AddComponent<InspectorPanel>();
             go.AddComponent<DaySummary>();
             go.AddComponent<HudDirector>();
         }
@@ -286,6 +308,7 @@ namespace SnowBound.EditorTools
             go.AddComponent<Ledger>();
             go.AddComponent<ResortRating>();
             go.AddComponent<ResortTraffic>();
+            go.AddComponent<GuestDirector>();
 
             var lift = Object.FindAnyObjectByType<Chairlift>();
             if (lift != null && lift.GetComponent<LiftFacility>() == null)
@@ -340,6 +363,8 @@ namespace SnowBound.EditorTools
             rig.target = player.transform;
             rig.input = player.GetComponent<PlayerInputReader>();
             rig.player = player;
+
+            if (cam.GetComponent<ManagementCamera>() == null) cam.gameObject.AddComponent<ManagementCamera>();
         }
 
         static void CreateLodge()

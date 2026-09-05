@@ -27,7 +27,6 @@ namespace SnowBound.Hud
         Canvas _canvas;
         UIPanel _panel;
 
-        Text _cash, _guests, _stars, _profit, _upkeep;
         UIStars _ratingStars;
         Text _ratingValue;
         readonly List<Text> _factorValues = new List<Text>();
@@ -86,51 +85,17 @@ namespace SnowBound.Hud
             _panel = layer.gameObject.AddComponent<UIPanel>();
             _panel.riseDistance = 18f;
 
-            // Light enough that the resort stays visible behind the numbers.
+            // Barely there. The management HUD is always up now, so this is
+            // an overlay on a working screen rather than a screen of its own.
             var scrim = layer.gameObject.AddComponent<Image>();
             scrim.sprite = UISprites.Pixel;
-            scrim.color = UITheme.Scrim;
+            scrim.color = new Color(0.02f, 0.03f, 0.05f, 0.42f);
             scrim.raycastTarget = false;
 
-            BuildTopBar(layer);
             BuildHeading(layer);
             BuildRatingPanel(layer);
             BuildFacilityCards(layer);
             BuildFooter(layer);
-        }
-
-        void BuildTopBar(Transform layer)
-        {
-            RectTransform bar = UIBuilder.Glass(layer, "TopBar", new Vector2(0.5f, 1f),
-                                                new Vector2(0.5f, 1f),
-                                                new Vector2(0f, -UITheme.Margin),
-                                                new Vector2(1500f, 104f));
-
-            _cash = Stat(bar, "Cash", UIIcons.Cash, "CASH", -580f, out _);
-            _guests = Stat(bar, "Guests", UIIcons.Guests, "GUESTS TODAY", -290f, out _);
-            _stars = Stat(bar, "Rating", UIIcons.Star, "RESORT RATING", 0f, out _);
-            _profit = Stat(bar, "Profit", UIIcons.ArrowUp, "PROFIT TODAY", 290f, out _);
-            _upkeep = Stat(bar, "Upkeep", UIIcons.Clock, "DAILY UPKEEP", 580f, out _);
-        }
-
-        Text Stat(Transform bar, string name, Sprite icon, string caption, float x, out Image iconImage)
-        {
-            iconImage = UIBuilder.Icon(bar, name + "Icon", icon, UITheme.InkFaint,
-                                       new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                                       new Vector2(x - 66f, -26f), 18f);
-
-            Text caption0 = UIBuilder.Label(bar, name + "Caption", UITheme.Micro, UITheme.InkFaint,
-                                            TextAnchor.UpperLeft);
-            UIBuilder.Place(caption0.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, 1f),
-                            new Vector2(x - 52f, -20f), new Vector2(230f, 18f));
-            caption0.text = UITheme.Track(caption);
-
-            Text value = UIBuilder.Label(bar, name + "Value", UITheme.Title, UITheme.Ink,
-                                         TextAnchor.UpperLeft, FontStyle.Bold);
-            UIBuilder.Place(value.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, 1f),
-                            new Vector2(x - 66f, -44f), new Vector2(240f, 40f));
-
-            return value;
         }
 
         void BuildHeading(Transform layer)
@@ -138,14 +103,14 @@ namespace SnowBound.Hud
             Text brand = UIBuilder.Label(layer, "Brand", UITheme.Micro, UITheme.InkFaint,
                                          TextAnchor.UpperLeft);
             UIBuilder.Place(brand.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                            new Vector2(UITheme.Margin + 20f, -170f), new Vector2(600f, 18f));
+                            new Vector2(UITheme.Margin + 20f, -140f), new Vector2(600f, 18f));
             brand.text = UITheme.Track(identity != null
                 ? identity.resortName.ToUpperInvariant() : "SNOWBOUND", 2);
 
             Text heading = UIBuilder.Label(layer, "Heading", UITheme.Hero, UITheme.Ink,
                                            TextAnchor.UpperLeft, FontStyle.Bold);
             UIBuilder.Place(heading.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                            new Vector2(UITheme.Margin + 18f, -192f), new Vector2(700f, 56f));
+                            new Vector2(UITheme.Margin + 18f, -162f), new Vector2(700f, 56f));
             heading.text = "RESORT OVERVIEW";
         }
 
@@ -153,8 +118,8 @@ namespace SnowBound.Hud
         {
             RectTransform panel = UIBuilder.Glass(layer, "RatingPanel", new Vector2(0f, 1f),
                                                   new Vector2(0f, 1f),
-                                                  new Vector2(UITheme.Margin, -268f),
-                                                  new Vector2(430f, 372f));
+                                                  new Vector2(UITheme.Margin, -238f),
+                                                  new Vector2(430f, 414f));
 
             var topLeft = new Vector2(0f, 1f);
 
@@ -179,7 +144,7 @@ namespace SnowBound.Hud
 
             for (int i = 0; i < rating.Factors.Count; i++)
             {
-                float y = -UITheme.Pad - 104f - i * 42f;
+                float y = -UITheme.Pad - 104f - i * 41f;
 
                 Text name = UIBuilder.Label(panel, "Factor" + i, UITheme.Label, UITheme.InkMuted,
                                             TextAnchor.UpperLeft);
@@ -214,7 +179,7 @@ namespace SnowBound.Hud
             Text caption = UIBuilder.Label(layer, "FacilitiesCaption", UITheme.Micro, UITheme.InkFaint,
                                            TextAnchor.UpperLeft);
             UIBuilder.Place(caption.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                            new Vector2(510f, -262f), new Vector2(500f, 18f));
+                            new Vector2(510f, -232f), new Vector2(500f, 18f));
             caption.text = UITheme.Track("FACILITIES");
 
             for (int i = 0; i < facilities.Length; i++)
@@ -227,7 +192,7 @@ namespace SnowBound.Hud
         {
             RectTransform card = UIBuilder.Glass(layer, facility.displayName + "Card",
                                                  new Vector2(0f, 1f), new Vector2(0f, 1f),
-                                                 new Vector2(x, -288f), new Vector2(336f, 352f),
+                                                 new Vector2(x, -258f), new Vector2(336f, 352f),
                                                  UITheme.Radius, UITheme.Card);
 
             var topLeft = new Vector2(0f, 1f);
@@ -355,24 +320,8 @@ namespace SnowBound.Hud
 
         void Refresh()
         {
-            if (ledger != null)
-            {
-                _cash.text = Ledger.Money(ledger.Cash);
-
-                float profit = ledger.Today.Profit;
-                _profit.text = Ledger.Signed(profit);
-                _profit.color = profit >= 0f ? UITheme.Positive : UITheme.Negative;
-            }
-
-            if (traffic != null)
-            {
-                _guests.text = traffic.GuestsToday.ToString();
-                _upkeep.text = Ledger.Money(traffic.DailyUpkeep);
-            }
-
             if (rating != null)
             {
-                _stars.text = rating.Stars.ToString("0.0");
                 _ratingValue.text = rating.Stars.ToString("0.0");
                 _ratingStars.Set(rating.Stars);
 

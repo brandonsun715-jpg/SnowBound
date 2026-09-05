@@ -1,4 +1,5 @@
 using UnityEngine;
+using SnowBound.Game;
 using SnowBound.Player;
 using SnowBound.Resort;
 using SnowBound.Weather;
@@ -8,87 +9,92 @@ namespace SnowBound.Hud
     /// <summary>
     /// Decides which interface the player is looking at.
     ///
-    /// The player should never see everything at once, so exactly one of the
-    /// riding HUD and the resort dashboard is up at a time, and the day's
-    /// figures outrank both. This is also the only place the cursor is locked
-    /// or freed, because two scripts fighting over the cursor is a bug you
-    /// only find on someone else's machine.
+    /// The mode is not decided here — ModeDirector owns that, and the cursor
+    /// with it. This only dresses whichever mode is current, and makes sure
+    /// exactly one interface is up: the riding HUD on the mountain, the
+    /// dashboard in management, neither during the flight between them, and
+    /// the day's figures over the top of all three.
     /// </summary>
     public class HudDirector : MonoBehaviour
     {
+        public ModeDirector modes;
         public PlayerController player;
         public SkiHud skiHud;
-        public ManagementScreen management;
+        public ManagementHud managementHud;
+        public ManagementScreen overview;
         public DaySummary summary;
         public NotificationStack notifications;
         public ResortRating rating;
         public WeatherSystem weather;
 
         [Header("Announcements")]
-        [Tooltip("Announce when the rating crosses a whole star.")]
         public bool announceRating = true;
 
         int _lastWholeStar = -1;
         bool _wasStorming;
-        bool _cursorFree;
 
         void Start()
         {
+            if (modes == null) modes = ModeDirector.Instance;
             if (player == null) player = FindAnyObjectByType<PlayerController>();
             if (skiHud == null) skiHud = FindAnyObjectByType<SkiHud>();
-            if (management == null) management = FindAnyObjectByType<ManagementScreen>();
+            if (managementHud == null) managementHud = FindAnyObjectByType<ManagementHud>();
+            if (overview == null) overview = FindAnyObjectByType<ManagementScreen>();
             if (summary == null) summary = FindAnyObjectByType<DaySummary>();
             if (notifications == null) notifications = FindAnyObjectByType<NotificationStack>();
             if (rating == null) rating = ResortRating.Instance;
             if (weather == null) weather = WeatherSystem.Instance;
-
-            SetCursorFree(false);
         }
 
         void Update()
         {
-            if (player == null || player.Input == null) return;
-
             bool booksOpen = summary != null && summary.IsOpen;
 
             if (booksOpen)
             {
-                if (management != null && management.IsOpen) management.Close();
-                if (skiHud != null) skiHud.SetVisible(false);
-                SetCursorFree(true);
+                Dress(false, false);
+                if (overview != null) overview.Close();
                 return;
             }
 
-            if (player.Input.ManagementPressed) Toggle();
+            bool flying = modes != null && modes.Transitioning;
+            bool managing = modes != null && modes.Mode == GameMode.Management && !flying;
+            bool riding = modes != null && modes.Mode == GameMode.Mountain && !flying;
 
-            bool managing = management != null && management.IsOpen;
+            Dress(riding, managing);
 
-            if (skiHud != null) skiHud.SetVisible(!managing);
-            SetCursorFree(managing);
-            player.Input.suspended = managing;
-
-            // Riding is not a time to be reading a spreadsheet, but the
-            // dashboard is safe to leave open while standing about.
-            if (managing && player.IsRidingSnow && player.Speed > 6f) Toggle();
+            if (!flying) ReadShortcuts(managing, riding);
 
             WatchForMoments();
         }
 
-        void Toggle()
+        void Dress(bool mountain, bool management)
         {
-            if (management == null) return;
+            if (skiHud != null) skiHud.SetVisible(mountain);
+            if (managementHud != null) managementHud.SetVisible(management);
 
-            if (management.IsOpen) management.Close();
-            else management.Open();
+            // Nothing but the world during a transition.
+            if (!management && overview != null && overview.IsOpen) overview.Close();
         }
 
-        void SetCursorFree(bool free)
+        void ReadShortcuts(bool managing, bool riding)
         {
-            if (free == _cursorFree) return;
+            // Escape steps back one level: out of a panel, then off the mountain.
+            if (ManagementInput.BackPressed)
+            {
+                if (managing && overview != null && overview.IsOpen) overview.Close();
+                else if (riding && modes != null) modes.EnterManagement();
+                return;
+            }
 
-            _cursorFree = free;
-            Cursor.lockState = free ? CursorLockMode.None : CursorLockMode.Locked;
-            Cursor.visible = free;
+            if (player == null || player.Input == null) return;
+            if (!player.Input.ManagementPressed) return;
+
+            if (riding && modes != null) { modes.EnterManagement(); return; }
+            if (!managing || overview == null) return;
+
+            if (overview.IsOpen) overview.Close();
+            else overview.Open();
         }
 
         /// <summary>The handful of things worth interrupting the player for.</summary>
@@ -99,6 +105,7 @@ namespace SnowBound.Hud
             if (announceRating && rating != null)
             {
                 int star = Mathf.FloorToInt(rating.Stars);
+
                 if (_lastWholeStar < 0) _lastWholeStar = star;
                 else if (star > _lastWholeStar)
                 {
@@ -116,7 +123,8 @@ namespace SnowBound.Hud
 
             bool storming = weather.storminess > 0.7f;
             if (storming && !_wasStorming)
-                notifications.Announce("Major snowstorm", "Guests are staying away. The powder will be worth it.");
+                notifications.Announce("Major snowstorm",
+                                       "Guests are staying away. The powder will be worth it.");
 
             _wasStorming = storming;
         }

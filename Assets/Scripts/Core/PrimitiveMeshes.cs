@@ -82,6 +82,26 @@ namespace SnowBound.Core
             AddQuad(verts, tris, a, b, e, d);    // underside
         }
 
+        /// <summary>A flat annulus lying in the XZ plane, facing up.</summary>
+        public static void AddRing(List<Vector3> verts, List<int> tris, Vector3 centre,
+                                   float innerRadius, float outerRadius, int segments)
+        {
+            segments = Mathf.Max(8, segments);
+
+            for (int i = 0; i < segments; i++)
+            {
+                float a0 = (i / (float)segments) * Mathf.PI * 2f;
+                float a1 = ((i + 1) / (float)segments) * Mathf.PI * 2f;
+
+                Vector3 d0 = new Vector3(Mathf.Cos(a0), 0f, Mathf.Sin(a0));
+                Vector3 d1 = new Vector3(Mathf.Cos(a1), 0f, Mathf.Sin(a1));
+
+                AddQuad(verts, tris,
+                        centre + d0 * innerRadius, centre + d0 * outerRadius,
+                        centre + d1 * outerRadius, centre + d1 * innerRadius);
+            }
+        }
+
         public static void AddTri(List<Vector3> verts, List<int> tris,
                                   Vector3 p0, Vector3 p1, Vector3 p2)
         {

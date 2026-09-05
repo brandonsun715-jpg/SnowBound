@@ -16,7 +16,7 @@ namespace SnowBound.Lifts
         [Tooltip("This chair's fixed place in the queue, in metres round the loop.")]
         public float loopOffset;
 
-        public PlayerController occupant;
+        public ILiftPassenger occupant;
 
         [Tooltip("What the rider had on their feet when they got on.")]
         public LocomotionKind riderGear = LocomotionKind.Ski;

@@ -333,9 +333,18 @@ namespace SnowBound.Mountain
 
         public Vector3 PistePoint(float z) { return PistePoint(0, z); }
 
-        /// <summary>Skiable length of a run, following its centre line.</summary>
+        readonly Dictionary<int, float> _lengthCache = new Dictionary<int, float>();
+        readonly Dictionary<int, float> _verticalCache = new Dictionary<int, float>();
+
+        /// <summary>
+        /// Skiable length of a run, following its centre line. Cached: this
+        /// walks sixty points and the interface asks for it every frame.
+        /// </summary>
         public float PisteLength(int index)
         {
+            float cached;
+            if (_lengthCache.TryGetValue(index, out cached)) return cached;
+
             const int steps = 60;
             float total = 0f;
             Vector3 previous = PistePoint(index, 0f);
@@ -347,13 +356,19 @@ namespace SnowBound.Mountain
                 previous = point;
             }
 
+            _lengthCache[index] = total;
             return total;
         }
 
         /// <summary>Vertical drop from the top of a run to the bottom.</summary>
         public float PisteVertical(int index)
         {
-            return Mathf.Max(0f, PistePoint(index, length).y - PistePoint(index, 0f).y);
+            float cached;
+            if (_verticalCache.TryGetValue(index, out cached)) return cached;
+
+            float drop = Mathf.Max(0f, PistePoint(index, length).y - PistePoint(index, 0f).y);
+            _verticalCache[index] = drop;
+            return drop;
         }
 
         // ---------------- mesh building ----------------------------------
@@ -370,6 +385,8 @@ namespace SnowBound.Mountain
             }
 
             EnsureNoise();
+            _lengthCache.Clear();
+            _verticalCache.Clear();
 
             int nx = Mathf.Max(2, Mathf.RoundToInt(width / cellSize) + 1);
             int nz = Mathf.Max(2, Mathf.RoundToInt(length / cellSize) + 1);

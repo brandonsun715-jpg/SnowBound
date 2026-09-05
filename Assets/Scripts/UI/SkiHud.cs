@@ -39,7 +39,7 @@ namespace SnowBound.Hud
 
         Canvas _canvas;
 
-        Text _brand, _mountainName, _conditions, _temperature;
+        Text _brand, _mountainName, _conditions, _temperature, _modeChip;
         Image _weatherIcon;
 
         Text _cash, _guests;
@@ -131,6 +131,12 @@ namespace SnowBound.Hud
                                            TextAnchor.UpperLeft);
             UIBuilder.Place(_temperature.rectTransform, topLeft, topLeft,
                             new Vector2(UITheme.Margin + 28f, -UITheme.Margin - 96f), new Vector2(300f, 18f));
+
+            _modeChip = UIBuilder.Label(root, "ModeChip", UITheme.Micro, UITheme.Ice,
+                                        TextAnchor.UpperLeft);
+            UIBuilder.Place(_modeChip.rectTransform, topLeft, topLeft,
+                            new Vector2(UITheme.Margin, -UITheme.Margin - 126f), new Vector2(360f, 18f));
+            _modeChip.text = UITheme.Track("MOUNTAIN MODE   ESC FOR RESORT");
         }
 
         void BuildStatusCluster(Transform root)

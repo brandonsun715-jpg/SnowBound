@@ -1,6 +1,7 @@
 using UnityEngine;
 using SnowBound.Core;
 using SnowBound.Buildings;
+using SnowBound.Lifts;
 
 namespace SnowBound.Player
 {
@@ -13,7 +14,7 @@ namespace SnowBound.Player
     /// </summary>
     [RequireComponent(typeof(CharacterController))]
     [RequireComponent(typeof(PlayerInputReader))]
-    public class PlayerController : MonoBehaviour
+    public class PlayerController : MonoBehaviour, ILiftPassenger
     {
         [Header("Physics")]
         [Tooltip("Stronger than real gravity because it makes jumps feel crisp.")]
@@ -263,6 +264,21 @@ namespace SnowBound.Player
         }
 
         // ---------------- riding a lift ---------------------------------
+
+        Transform ILiftPassenger.Transform { get { return transform; } }
+        LocomotionKind ILiftPassenger.Gear { get { return CurrentKind; } }
+        bool ILiftPassenger.WaitingToBoard { get { return !IsRiding && IsGrounded; } }
+
+        void ILiftPassenger.BoardLift(Transform seat, Vector3 seatOffset)
+        {
+            AttachTo(seat, seatOffset);
+        }
+
+        void ILiftPassenger.LeaveLift(Vector3 position, Vector3 facing, Vector3 velocity)
+        {
+            Detach(position, facing, velocity, CurrentKind);
+        }
+
 
         /// <summary>
         /// Hand control to a chairlift seat. Physics and input stop; the body

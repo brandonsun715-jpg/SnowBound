@@ -49,6 +49,7 @@ namespace SnowBound.Resort
         LiftFacility _lift;
         LodgeFacility _lodge;
         ParkFacility _park;
+        GuestDirector _guests;
 
         void OnEnable() { _instance = this; }
 
@@ -56,12 +57,13 @@ namespace SnowBound.Resort
         {
             _instance = this;
 
-            _factors.Add(new Factor { name = "Lifts", weight = 0.22f });
-            _factors.Add(new Factor { name = "Trails", weight = 0.20f });
-            _factors.Add(new Factor { name = "Lodge", weight = 0.18f });
-            _factors.Add(new Factor { name = "Variety", weight = 0.14f });
-            _factors.Add(new Factor { name = "Conditions", weight = 0.14f });
-            _factors.Add(new Factor { name = "Terrain Park", weight = 0.12f });
+            _factors.Add(new Factor { name = "Lifts", weight = 0.20f });
+            _factors.Add(new Factor { name = "Trails", weight = 0.18f });
+            _factors.Add(new Factor { name = "Happiness", weight = 0.16f });
+            _factors.Add(new Factor { name = "Lodge", weight = 0.15f });
+            _factors.Add(new Factor { name = "Variety", weight = 0.12f });
+            _factors.Add(new Factor { name = "Conditions", weight = 0.11f });
+            _factors.Add(new Factor { name = "Terrain Park", weight = 0.08f });
         }
 
         void Start()
@@ -71,6 +73,7 @@ namespace SnowBound.Resort
             _lift = FindAnyObjectByType<LiftFacility>();
             _lodge = FindAnyObjectByType<LodgeFacility>();
             _park = FindAnyObjectByType<ParkFacility>();
+            _guests = GuestDirector.Instance;
 
             Measure();
             Score = Target();
@@ -98,14 +101,15 @@ namespace SnowBound.Resort
 
         void Measure()
         {
-            if (_factors.Count < 6) return;
+            if (_factors.Count < 7) return;
 
             _factors[0].value = _lift != null ? _lift.Quality : 0.2f;
             _factors[1].value = Trails();
-            _factors[2].value = _lodge != null ? _lodge.Quality : 0.2f;
-            _factors[3].value = Variety();
-            _factors[4].value = Conditions();
-            _factors[5].value = _park != null ? _park.Quality : 0f;
+            _factors[2].value = _guests != null ? _guests.Happiness : 0.7f;
+            _factors[3].value = _lodge != null ? _lodge.Quality : 0.2f;
+            _factors[4].value = Variety();
+            _factors[5].value = Conditions();
+            _factors[6].value = _park != null ? _park.Quality : 0f;
         }
 
         float Trails()

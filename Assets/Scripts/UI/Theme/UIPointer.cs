@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
@@ -51,6 +52,38 @@ namespace SnowBound.Hud
 #else
                 return Input.GetMouseButton(0);
 #endif
+            }
+        }
+
+        static readonly List<RectTransform> _blockers = new List<RectTransform>();
+
+        /// <summary>
+        /// Panels that swallow clicks. The world selection raycast asks this
+        /// before firing, so clicking a button never also selects whatever
+        /// happens to be behind it.
+        /// </summary>
+        public static void Block(RectTransform rect)
+        {
+            if (rect != null && !_blockers.Contains(rect)) _blockers.Add(rect);
+        }
+
+        public static void Unblock(RectTransform rect)
+        {
+            _blockers.Remove(rect);
+        }
+
+        public static bool OverInterface
+        {
+            get
+            {
+                for (int i = _blockers.Count - 1; i >= 0; i--)
+                {
+                    RectTransform rect = _blockers[i];
+                    if (rect == null) { _blockers.RemoveAt(i); continue; }
+                    if (!rect.gameObject.activeInHierarchy) continue;
+                    if (Over(rect)) return true;
+                }
+                return false;
             }
         }
 

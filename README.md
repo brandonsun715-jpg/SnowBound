@@ -27,7 +27,8 @@ Assets/
     Buildings/            resort buildings (lodge today, more with the tycoon)
     Lifts/                chairlift path, chairs and operation
     Game/                 loop rules: gear rack, run timing
-    Resort/               the tycoon layer: clock, money, facilities, demand
+    Resort/               the tycoon layer: clock, money, facilities, demand, guests
+    Game/                 modes, the management camera, world selection
     Weather/              sky, snowfall, snow conditions
     Audio/                what the ride and the lift sound like
     UI/                   the interface
@@ -72,7 +73,7 @@ Milestone 2 is complete.
 ## Milestone 3 — resort management
 
 1. **Economy** — cash, a resort day, revenue, upkeep, end-of-day figures. *(done)*
-2. Guests: NPCs who arrive, buy tickets, ride, ski and leave.
+2. **Guests** — NPCs who arrive, buy tickets, ride the lift, ski and leave. *(done)*
 3. **Resort rating** out of five, from weighted factors. *(done)*
 4. Building system: place a lodge, rental, restaurant, shop, ticket booth.
 5. Upgrade system for the lift, lodge, trails and park.
@@ -89,6 +90,17 @@ rather than a list of clicks to remember.
 props after changing generator settings.
 
 ## Controls
+
+**Management mode** (the game starts here)
+
+| Input | Action |
+|---|---|
+| `W A S D` / arrows | Pan the camera |
+| Scroll wheel | Zoom |
+| Middle mouse drag | Rotate |
+| Left click | Select a lift, building, trail or guest |
+| `Tab` | Facilities and upgrades |
+| ENTER MOUNTAIN | Fly down and take control |
 
 **On foot**
 
@@ -115,8 +127,19 @@ props after changing generator settings.
 | Scroll wheel | Zoom in / out |
 | `1` / `2` / `3` | Walk / ski / snowboard, **at the lodge gear rack only** |
 | `V` | Step the weather on (clear, snow, storm) |
-| `Tab` | Open and close the resort dashboard |
+| `Tab` / `Esc` | Return to management |
 | `Esc` | Release the mouse cursor (in the editor) |
+
+## Two views of one world
+
+The game opens as the owner, looking down at the mountain. `ENTER MOUNTAIN`
+flies the camera down and hands over to the third-person controller; `Esc`
+flies it back up. There is one world and one camera: management and mountain
+are two rigs that both know where the camera should be, and switching flies
+between their answers rather than cutting.
+
+Nothing pauses, resets or reloads across the switch, so the guests you were
+watching from above are the guests you ski past.
 
 ## The loop
 

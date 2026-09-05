@@ -82,11 +82,48 @@ namespace SnowBound.Lifts
 
         ChairliftPath _path;
         readonly List<ChairliftChair> _chairs = new List<ChairliftChair>();
+        readonly List<ILiftPassenger> _queue = new List<ILiftPassenger>();
         float _travel;
         float _boardS;
         float _unloadS;
 
         void OnEnable() { _instance = this; }
+
+        /// <summary>Join the queue. Idempotent, so callers can be careless.</summary>
+        public void Register(ILiftPassenger passenger)
+        {
+            if (passenger == null || _queue.Contains(passenger)) return;
+            _queue.Add(passenger);
+        }
+
+        public void Unregister(ILiftPassenger passenger)
+        {
+            _queue.Remove(passenger);
+            ReleaseSeat(passenger);
+        }
+
+        /// <summary>
+        /// Empty whatever chair this passenger is in. A guest that despawns
+        /// mid-ride would otherwise leave a chair permanently occupied by a
+        /// reference to something that no longer exists.
+        /// </summary>
+        public void ReleaseSeat(ILiftPassenger passenger)
+        {
+            if (passenger == null) return;
+
+            foreach (ChairliftChair chair in _chairs)
+            {
+                if (chair != null && ReferenceEquals(chair.occupant, passenger)) chair.occupant = null;
+            }
+        }
+
+        /// <summary>Where a passenger should stand to be picked up.</summary>
+        public bool InLoadingArea(Vector3 position)
+        {
+            Vector3 offset = position - BoardingPoint;
+            offset.y = 0f;
+            return offset.magnitude <= boardRadius;
+        }
         void Start() { Build(); }
 
         static void Kill(Object o)
@@ -369,38 +406,68 @@ namespace SnowBound.Lifts
 
         void RunStations()
         {
-            if (player == null) player = FindAnyObjectByType<PlayerController>();
-            if (player == null) return;
+            if (player == null)
+            {
+                player = FindAnyObjectByType<PlayerController>();
+                if (player != null) Register(player);
+            }
 
-            if (player.IsRiding) { CheckUnload(); return; }
+            PlayerInLoadingArea = player != null && !player.IsRiding && player.IsGrounded &&
+                                  InLoadingArea(player.transform.position);
 
-            PlayerInLoadingArea = player.IsGrounded &&
-                                  Flat(player.transform.position - BoardingPoint).magnitude <= boardRadius;
+            Unload();
+            Board();
+        }
 
-            if (!PlayerInLoadingArea) return;
-
+        void Board()
+        {
             foreach (ChairliftChair chair in _chairs)
             {
                 if (chair == null || !chair.IsFree) continue;
                 if (Mathf.Abs(_path.Gap(chair.loopOffset + _travel, _boardS)) > catchWindow) continue;
 
-                chair.occupant = player;
-                chair.riderGear = player.CurrentKind;
-                player.AttachTo(chair.seat, seatOffset);
-                PlayerInLoadingArea = false;
+                ILiftPassenger next = NextInQueue();
+                if (next == null) return;
+
+                chair.occupant = next;
+                chair.riderGear = next.Gear;
+                next.BoardLift(chair.seat, seatOffset);
+
+                if (ReferenceEquals(next, player)) PlayerInLoadingArea = false;
                 return;
             }
         }
 
-        void CheckUnload()
+        ILiftPassenger NextInQueue()
+        {
+            for (int i = 0; i < _queue.Count; i++)
+            {
+                ILiftPassenger passenger = _queue[i];
+
+                // Anything that has been destroyed since it queued.
+                if (passenger == null || passenger.Transform == null)
+                {
+                    _queue.RemoveAt(i--);
+                    continue;
+                }
+
+                if (!passenger.WaitingToBoard) continue;
+                if (!InLoadingArea(passenger.Transform.position)) continue;
+
+                return passenger;
+            }
+
+            return null;
+        }
+
+        void Unload()
         {
             foreach (ChairliftChair chair in _chairs)
             {
-                if (chair == null || chair.occupant != player) continue;
+                if (chair == null || chair.occupant == null) continue;
                 if (Mathf.Abs(_path.Gap(chair.loopOffset + _travel, _unloadS)) > catchWindow) continue;
 
                 Unload(chair);
-                return;
             }
         }
 
@@ -421,8 +488,11 @@ namespace SnowBound.Lifts
             if (facing.sqrMagnitude < 0.0001f) facing = Vector3.back;
             facing.Normalize();
 
-            player.Detach(spot, facing, facing * 3f, chair.riderGear);
+            ILiftPassenger passenger = chair.occupant;
             chair.occupant = null;
+
+            if (passenger != null && passenger.Transform != null)
+                passenger.LeaveLift(spot, facing, facing * 3f);
         }
 
         static Vector3 Flat(Vector3 v)
