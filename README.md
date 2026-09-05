@@ -125,7 +125,7 @@ props after changing generator settings.
 | Left click | Select a lift, building, run, guest or open ground |
 | Right click, without dragging | Cancel or undo |
 | `Tab` | Resort overview: rating, facilities, upgrades |
-| BUILD / TERRAIN / TRAILS / LIFTS | The tool dock along the bottom |
+| BUILD / TERRAIN / TRAILS / LIFTS / RESORT | The row of tabs along the bottom, always on screen |
 | ENTER MOUNTAIN | Fly down and take control |
 
 **Shaping the mountain** (TERRAIN)
@@ -348,8 +348,12 @@ was created with; picking the wrong one leaves every button silently dead.
   genuinely inside the mountain or outside the map, and never interrupts a jump.
 - Ground the resort depends on is protected. The lodge's footings and every
   lift station refuse to be sculpted, and say which building is refusing.
-- The interface is banded: a top bar, a tool dock along the bottom, an
-  inspector rail on the right, and nothing in the middle. The dock shows one
+- The row of tabs along the bottom is always on screen in management mode,
+  because it is the only way into the tools. A menu you can only reach by
+  already being in the menu is not a menu. The panel it opens sits above it,
+  and the tab holding the next obvious thing to do is lit.
+- The interface is banded: a top bar, the tabs and their panel along the
+  bottom, an inspector rail on the right, and nothing in the middle. The dock shows one
   page at a time, which is what makes overlapping tool panels impossible rather
   than merely unlikely. Every panel is anchored to the edge it belongs to and
   sized against a four-by-three window, so it cannot run off the side of a

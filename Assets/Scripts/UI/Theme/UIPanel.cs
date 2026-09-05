@@ -38,9 +38,25 @@ namespace SnowBound.Hud
             _restPosition = _rect.anchoredPosition;
         }
 
-        public void Show() { _wantShown = true; _resting = false; gameObject.SetActive(true); }
+        public void Show()
+        {
+            gameObject.SetActive(true);
 
-        public void Hide() { _wantShown = false; _resting = false; }
+            // Asking for a state it is already in must not restart the fade.
+            // Directors call these every frame.
+            if (_wantShown) return;
+
+            _wantShown = true;
+            _resting = false;
+        }
+
+        public void Hide()
+        {
+            if (!_wantShown) return;
+
+            _wantShown = false;
+            _resting = false;
+        }
 
         public void ShowInstantly()
         {

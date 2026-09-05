@@ -135,14 +135,14 @@ namespace SnowBound.Hud
             Text brand = UIBuilder.Label(layer, "Brand", UITheme.Micro, UITheme.InkFaint,
                                          TextAnchor.UpperLeft);
             UIBuilder.Place(brand.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                            new Vector2(UILayout.Margin + 4f, Below - 24f), new Vector2(600f, 18f));
+                            new Vector2(UILayout.Margin + 4f, Below), new Vector2(600f, 18f));
             brand.text = UITheme.Track(identity != null
                 ? identity.resortName.ToUpperInvariant() : "SNOWBOUND", 2);
 
             Text heading = UIBuilder.Label(layer, "Heading", UITheme.Hero, UITheme.Ink,
                                            TextAnchor.UpperLeft, FontStyle.Bold);
             UIBuilder.Place(heading.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                            new Vector2(UILayout.Margin + 2f, Below), new Vector2(700f, 56f));
+                            new Vector2(UILayout.Margin + 2f, Below - 22f), new Vector2(700f, 56f));
             heading.text = "RESORT OVERVIEW";
         }
 
@@ -150,7 +150,7 @@ namespace SnowBound.Hud
         {
             RectTransform panel = UIBuilder.Glass(layer, "RatingPanel", new Vector2(0f, 1f),
                                                   new Vector2(0f, 1f),
-                                                  new Vector2(UILayout.Margin, Below - 72f),
+                                                  new Vector2(UILayout.Margin, Below - 94f),
                                                   new Vector2(430f, 430f));
 
             var topLeft = new Vector2(0f, 1f);
@@ -208,7 +208,7 @@ namespace SnowBound.Hud
             Text caption = UIBuilder.Label(layer, "FacilitiesCaption", UITheme.Micro, UITheme.InkFaint,
                                            TextAnchor.UpperLeft);
             UIBuilder.Place(caption.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                            new Vector2(CardLeft, Below - 78f), new Vector2(500f, 18f));
+                            new Vector2(CardLeft, Below - 100f), new Vector2(500f, 18f));
             caption.text = UITheme.Track("FACILITIES");
             _facilitiesCaption = caption;
 
@@ -217,7 +217,7 @@ namespace SnowBound.Hud
             float right = CardLeft + PerPage * CardStride;
 
             UIBuilder.Place(_pageLabel.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                            new Vector2(right - 116f, Below - 84f), new Vector2(60f, 22f));
+                            new Vector2(right - 116f, Below - 106f), new Vector2(60f, 22f));
 
             _older = Arrow(layer, "Older", right - 160f, "<", -1);
             _newer = Arrow(layer, "Newer", right - 52f, ">", 1);
@@ -227,7 +227,7 @@ namespace SnowBound.Hud
         {
             RectTransform button = UIBuilder.Place(UIBuilder.Node(layer, name),
                                                    new Vector2(0f, 1f), new Vector2(0f, 1f),
-                                                   new Vector2(x, Below - 84f), new Vector2(40f, 26f));
+                                                   new Vector2(x, Below - 106f), new Vector2(40f, 26f));
             UIPointer.Block(button);
 
             var fill = button.gameObject.AddComponent<Image>();
@@ -314,7 +314,7 @@ namespace SnowBound.Hud
 
                 card.root.gameObject.SetActive(visible);
                 if (visible)
-                    card.root.anchoredPosition = new Vector2(CardLeft + column * CardStride, Below - 100f);
+                    card.root.anchoredPosition = new Vector2(CardLeft + column * CardStride, Below - 122f);
             }
 
             if (_pageLabel != null) _pageLabel.text = UITheme.Track((_page + 1) + " / " + Pages);
@@ -340,7 +340,7 @@ namespace SnowBound.Hud
         {
             RectTransform card = UIBuilder.Glass(layer, facility.displayName + "Card",
                                                  new Vector2(0f, 1f), new Vector2(0f, 1f),
-                                                 new Vector2(x, Below - 100f), new Vector2(CardWidth, 340f),
+                                                 new Vector2(x, Below - 122f), new Vector2(CardWidth, 340f),
                                                  UITheme.Radius, UITheme.Card);
             UIPointer.Block(card);
 
@@ -430,8 +430,8 @@ namespace SnowBound.Hud
             Text footer = UIBuilder.Label(layer, "Footer", UITheme.Label, UITheme.InkFaint,
                                           TextAnchor.LowerCenter);
             UIBuilder.Place(footer.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-                            new Vector2(0f, UILayout.Margin), new Vector2(900f, 24f));
-            footer.text = UITheme.Track("TAB  RETURN TO THE MOUNTAIN", 1);
+                            new Vector2(0f, UILayout.DockBottom + 6f), new Vector2(900f, 24f));
+            footer.text = UITheme.Track("TAB  OR  RESORT  TO CLOSE", 1);
         }
 
         static Sprite IconFor(Facility facility)

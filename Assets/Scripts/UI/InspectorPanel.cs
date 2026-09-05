@@ -74,7 +74,7 @@ namespace SnowBound.Hud
                                     new Vector2(1f, 1f),
                                     new Vector2(-UILayout.Margin, -UILayout.UnderTopBar),
                                     new Vector2(UILayout.RailWidth,
-                                                Mathf.Min(410f, UILayout.RailHeight)));
+                                                Mathf.Min(348f, UILayout.RailHeight)));
 
             _card.gameObject.AddComponent<CanvasGroup>();
             _panel = _card.gameObject.AddComponent<UIPanel>();
@@ -85,46 +85,54 @@ namespace SnowBound.Hud
             _title = UIBuilder.Label(_card, "Title", UITheme.Title, UITheme.Ink,
                                      TextAnchor.UpperLeft, FontStyle.Bold);
             UIBuilder.Place(_title.rectTransform, topLeft, topLeft,
-                            new Vector2(UITheme.Pad, -UITheme.Pad), new Vector2(330f, 40f));
+                            new Vector2(UITheme.Pad, -UITheme.Pad),
+                            new Vector2(UILayout.RailWidth - UITheme.Pad * 2f, 34f));
 
             _subtitle = UIBuilder.Label(_card, "Subtitle", UITheme.Micro, UITheme.Ice,
                                         TextAnchor.UpperLeft);
             UIBuilder.Place(_subtitle.rectTransform, topLeft, topLeft,
-                            new Vector2(UITheme.Pad, -UITheme.Pad - 38f), new Vector2(330f, 18f));
+                            new Vector2(UITheme.Pad, -UITheme.Pad - 34f),
+                            new Vector2(UILayout.RailWidth - UITheme.Pad * 2f, 18f));
 
             UIBuilder.Rule(_card, "Rule", topLeft, topLeft,
-                           new Vector2(UITheme.Pad, -UITheme.Pad - 60f), UILayout.RailWidth - UITheme.Pad * 2f);
+                           new Vector2(UITheme.Pad, -UITheme.Pad - 56f), UILayout.RailWidth - UITheme.Pad * 2f);
 
             _labels = UIBuilder.Label(_card, "Labels", UITheme.Label, UITheme.InkMuted,
                                       TextAnchor.UpperLeft);
             UIBuilder.Place(_labels.rectTransform, topLeft, topLeft,
-                            new Vector2(UITheme.Pad, -UITheme.Pad - 70f), new Vector2(180f, 168f));
+                            new Vector2(UITheme.Pad, -UITheme.Pad - 66f), new Vector2(178f, 168f));
 
             _values = UIBuilder.Label(_card, "Values", UITheme.Label, UITheme.Ink,
                                       TextAnchor.UpperRight);
             UIBuilder.Place(_values.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f),
-                            new Vector2(-UITheme.Pad, -UITheme.Pad - 70f), new Vector2(190f, 168f));
+                            new Vector2(-UITheme.Pad, -UITheme.Pad - 66f), new Vector2(188f, 168f));
 
             _stars = UIStars.Create(_card, "Stars", topLeft, topLeft,
-                                    new Vector2(UITheme.Pad, -UITheme.Pad - 248f), 14f, 5f);
+                                    new Vector2(UITheme.Pad, -UITheme.Pad - 240f), 13f, 4f);
 
-            _upgrade = MakeButton("Upgrade", UITheme.Pad + 52f, out _upgradeLabel);
+            // Side by side rather than stacked. The rail has to clear the tool
+            // dock, and two rows of buttons is the fifty pixels that stops it.
+            _upgrade = MakeButton("Upgrade", 1, out _upgradeLabel);
             _upgrade.Clicked += Upgrade;
 
             Text closeLabel;
-            _close = MakeButton("Close", UITheme.Pad, out closeLabel);
+            _close = MakeButton("Close", 0, out closeLabel);
             closeLabel.text = UITheme.Track("CLOSE");
             _close.Clicked += () => { if (selection != null) selection.Clear(); };
 
             _panel.HideInstantly();
         }
 
-        UIButton MakeButton(string name, float fromBottom, out Text label)
+        /// <summary>One of two buttons across the bottom of the card.</summary>
+        UIButton MakeButton(string name, int column, out Text label)
         {
+            float span = UILayout.RailWidth - UITheme.Pad * 2f;
+            float width = (span - 8f) * 0.5f;
+
             RectTransform button = UIBuilder.Place(UIBuilder.Node(_card, name),
-                                                   new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-                                                   new Vector2(0f, fromBottom),
-                                                   new Vector2(UILayout.RailWidth - UITheme.Pad * 2f, 42f));
+                                                   new Vector2(0f, 0f), new Vector2(0f, 0f),
+                                                   new Vector2(UITheme.Pad + column * (width + 8f), UITheme.Pad),
+                                                   new Vector2(width, 40f));
 
             var fill = button.gameObject.AddComponent<Image>();
             fill.sprite = UISprites.Fill(UITheme.RadiusSmall);
@@ -336,6 +344,13 @@ namespace SnowBound.Hud
         void ShowUpgrade(bool visible)
         {
             _upgrade.gameObject.SetActive(visible);
+
+            // With nothing to upgrade, Close takes the whole row rather than
+            // sitting in half of it beside a gap.
+            float span = UILayout.RailWidth - UITheme.Pad * 2f;
+            var closeRect = _close.GetComponent<RectTransform>();
+            closeRect.sizeDelta = new Vector2(visible ? (span - 8f) * 0.5f : span, 40f);
+
             if (!visible) return;
 
             if (_facility == null || !_facility.CanUpgrade)

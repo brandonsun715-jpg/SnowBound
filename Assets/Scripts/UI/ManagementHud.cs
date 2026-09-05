@@ -99,14 +99,12 @@ namespace SnowBound.Hud
             _stars = UIStars.Create(bar, "Stars", new Vector2(0f, 0f), new Vector2(0f, 0f),
                                     new Vector2(x + stride * 3f, 12f), 9f, 3f);
 
-            // The two buttons hug the right edge, so the figures grow leftwards
-            // into empty space instead of running underneath them.
-            UIButton enter = Chip(bar, "ENTER MOUNTAIN", -UITheme.Pad, 168f);
+            // One button on the bar. Everything the owner can open lives in the
+            // row of tabs along the bottom, including the resort overview, so
+            // there is one place to look rather than two.
+            UIButton enter = Chip(bar, "ENTER MOUNTAIN", -UITheme.Pad, 186f);
             enter.SetRestColour(UITheme.CardHover);
             enter.Clicked += () => { if (modes != null) modes.EnterMountain(); };
-
-            UIButton resort = Chip(bar, "RESORT", -UITheme.Pad - 176f, 150f);
-            resort.Clicked += Overview;
         }
 
         void BuildPlaceChip(Transform layer)
@@ -133,16 +131,6 @@ namespace SnowBound.Hud
                                      TextAnchor.UpperLeft);
             UIBuilder.Place(_state.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f),
                             new Vector2(14f, -58f), new Vector2(258f, 16f));
-        }
-
-        void Overview()
-        {
-            if (overview == null) return;
-
-            if (dock != null) dock.Close();
-
-            if (overview.IsOpen) overview.Close();
-            else overview.Open();
         }
 
         /// <summary>One figure in the top bar: a caption, an icon and a number.</summary>

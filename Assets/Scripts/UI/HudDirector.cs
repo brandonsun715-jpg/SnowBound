@@ -84,11 +84,14 @@ namespace SnowBound.Hud
             if (skiHud != null) skiHud.SetVisible(mountain);
             if (managementHud != null) managementHud.SetVisible(management);
 
+            // The tabs are the only way into the tools, so they are up whenever
+            // the player is managing and gone the moment they are not.
+            if (dock != null) dock.SetVisible(management);
+
             // Nothing but the world during a transition.
             if (management) return;
 
             if (overview != null && overview.IsOpen) overview.Close();
-            if (dock != null && dock.IsOpen) dock.Close();
         }
 
         /// <summary>

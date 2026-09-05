@@ -12,19 +12,23 @@ namespace SnowBound.Hud
     /// Everything the owner does to the mountain, in one dock along the bottom
     /// of the screen.
     ///
-    /// One dock, one page at a time. That is not a stylistic choice: it is the
+    /// The row of tabs is always on screen in management mode, because it is
+    /// the only way into the tools: hiding it until a tool was open would
+    /// leave the player with nothing to click and no idea where anything is.
+    /// The panel it opens sits above it.
+    ///
+    /// One panel, one page at a time. That is not a stylistic choice: it is the
     /// reason two tool panels can never end up on top of each other, whatever
     /// order the player clicks things in. The dock owns its pages, so opening
-    /// one closes the last, and closing the dock stands down whichever tool
-    /// was live.
+    /// one closes the last, and closing it stands down whichever tool was live.
     ///
-    /// The dock is a fixed width that fits a four-by-three window, anchored to
-    /// the bottom centre, so on a wider screen it simply sits in more space
-    /// rather than stretching or spilling.
+    /// Everything is a fixed width that fits a four-by-three window, anchored
+    /// to the bottom centre, so on a wider screen it sits in more space rather
+    /// than stretching or spilling.
     /// </summary>
     public class ToolDock : MonoBehaviour
     {
-        public enum Page { None, Build, Terrain, Trails, Lifts }
+        public enum Page { None, Build, Terrain, Trails, Lifts, Resort }
 
         public BuildController builder;
         public TerrainSculptor sculptor;
@@ -32,9 +36,11 @@ namespace SnowBound.Hud
         public LiftPlacer lifts;
         public Ledger ledger;
         public MountainGenerator mountain;
+        public ManagementScreen overview;
 
         Canvas _canvas;
-        UIPanel _panel;
+        UIPanel _panel;      // the page that is open
+        UIPanel _bar;        // the row of tabs, always up in management mode
         RectTransform _dock;
         Text _status;
 
@@ -73,23 +79,55 @@ namespace SnowBound.Hud
             if (lifts == null) lifts = FindAnyObjectByType<LiftPlacer>();
             if (ledger == null) ledger = Ledger.Instance;
             if (mountain == null) mountain = MountainGenerator.Instance;
+            if (overview == null) overview = FindAnyObjectByType<ManagementScreen>();
 
             Build();
 
             _panel.HideInstantly();
+            _bar.HideInstantly();
             _canvas.enabled = false;
+        }
+
+        /// <summary>Show or hide the tabs. Called when the mode changes.</summary>
+        public void SetVisible(bool visible)
+        {
+            if (_canvas == null) return;
+
+            if (!visible) { Close(); _bar.Hide(); return; }
+
+            _canvas.enabled = true;
+            _bar.Show();
         }
 
         // ---------------- opening and closing -------------------------------
 
-        public bool IsOpen { get { return _canvas != null && _canvas.enabled; } }
+        /// <summary>A page is open, as opposed to just the tabs being up.</summary>
+        public bool PageOpen { get { return _page != Page.None; } }
+
+        /// <summary>Kept for the escape ladder: is there anything to close?</summary>
+        public bool IsOpen { get { return PageOpen; } }
+
         public Page Current { get { return _page; } }
 
         public void Open(Page page)
         {
             if (_canvas == null) return;
 
-            if (_page == page && IsOpen) { Close(); return; }
+            // The resort overview is a screen of its own rather than a page in
+            // the dock, but it belongs in the same row: one place for
+            // everything the owner can open.
+            if (page == Page.Resort)
+            {
+                Close();
+                if (overview == null) return;
+
+                if (overview.IsOpen) overview.Close(); else overview.Open();
+                return;
+            }
+
+            if (overview != null) overview.Close();
+
+            if (_page == page && PageOpen) { Close(); return; }
 
             StandDown();
 
@@ -98,11 +136,11 @@ namespace SnowBound.Hud
             _panel.Show();
 
             foreach (var pair in _pages) pair.Value.gameObject.SetActive(pair.Key == page);
-            foreach (var pair in _tabs) pair.Value.SetRestColour(pair.Key == page ? UITheme.CardActive : UITheme.Card);
 
             if (page == Page.Terrain && sculptor != null) sculptor.Begin(sculptor.tool);
         }
 
+        /// <summary>Close whatever page is open. The tabs stay.</summary>
         public void Close()
         {
             if (_canvas == null) return;
@@ -110,10 +148,7 @@ namespace SnowBound.Hud
             StandDown();
 
             _page = Page.None;
-            foreach (var pair in _tabs) pair.Value.SetRestColour(UITheme.Card);
-
             _panel.Hide();
-            _canvas.enabled = false;
         }
 
         /// <summary>Put down whatever tool is in hand, without closing the dock.</summary>
@@ -143,16 +178,16 @@ namespace SnowBound.Hud
         {
             _canvas = UIBuilder.Canvas(transform, "ToolDock", 12);
 
+            BuildTabs();
+
             _dock = UIBuilder.Glass(_canvas.transform, "Dock",
                                     new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-                                    new Vector2(0f, UILayout.Margin),
+                                    new Vector2(0f, UILayout.DockBottom),
                                     new Vector2(UILayout.SafeWidth, UILayout.DockHeight));
             UIPointer.Block(_dock);
 
             _dock.gameObject.AddComponent<CanvasGroup>();
             _panel = _dock.gameObject.AddComponent<UIPanel>();
-
-            BuildTabs();
 
             _pages[Page.Build] = BuildPage("BuildPage", BuildBuildingRow);
             _pages[Page.Terrain] = BuildPage("TerrainPage", BuildTerrainTools);
@@ -167,6 +202,10 @@ namespace SnowBound.Hud
             foreach (var pair in _pages) pair.Value.gameObject.SetActive(false);
         }
 
+        /// <summary>
+        /// The row of tabs. It lives outside the panel it opens, because a
+        /// menu you can only reach by already being in the menu is not a menu.
+        /// </summary>
         void BuildTabs()
         {
             var names = new[]
@@ -174,23 +213,61 @@ namespace SnowBound.Hud
                 new KeyValuePair<Page, string>(Page.Build, "BUILD"),
                 new KeyValuePair<Page, string>(Page.Terrain, "TERRAIN"),
                 new KeyValuePair<Page, string>(Page.Trails, "TRAILS"),
-                new KeyValuePair<Page, string>(Page.Lifts, "LIFTS")
+                new KeyValuePair<Page, string>(Page.Lifts, "LIFTS"),
+                new KeyValuePair<Page, string>(Page.Resort, "RESORT")
             };
 
-            const float tabWidth = 150f;
-            const float gap = 8f;
+            const float tabWidth = 158f;
+            const float gap = 6f;
+
+            float width = names.Length * (tabWidth + gap) - gap + UITheme.Pad;
+
+            RectTransform bar = UIBuilder.Glass(_canvas.transform, "Tabs",
+                                                new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
+                                                new Vector2(0f, UILayout.Margin),
+                                                new Vector2(width, UILayout.TabBarHeight),
+                                                UITheme.RadiusSmall);
+            UIPointer.Block(bar);
+
+            bar.gameObject.AddComponent<CanvasGroup>();
+            _bar = bar.gameObject.AddComponent<UIPanel>();
+            _bar.riseDistance = 8f;
+
+            float left = UITheme.Pad * 0.5f;
 
             for (int i = 0; i < names.Length; i++)
             {
-                float x = UITheme.Pad + i * (tabWidth + gap);
-
-                UIButton tab = Chip(_dock, names[i].Value, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                                    new Vector2(x, -UITheme.Pad * 0.6f), new Vector2(tabWidth, 38f));
+                UIButton tab = Chip(bar, names[i].Value, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
+                                    new Vector2(left + i * (tabWidth + gap), 0f),
+                                    new Vector2(tabWidth, UILayout.TabBarHeight - 12f));
 
                 Page page = names[i].Key;
                 tab.Clicked += () => Open(page);
 
                 _tabs[page] = tab;
+            }
+        }
+
+        /// <summary>
+        /// Light up the tab that has the next obvious thing to do on it, so a
+        /// new resort is not five unlabelled choices with no order to them.
+        /// </summary>
+        float _liftCheckedAt = -99f;
+        bool _hasLift;
+
+        Page Suggested
+        {
+            get
+            {
+                if (mountain != null && mountain.TrailCount == 0) return Page.Trails;
+
+                if (Time.time - _liftCheckedAt > 0.5f)
+                {
+                    _liftCheckedAt = Time.time;
+                    _hasLift = FindAnyObjectByType<Chairlift>() != null;
+                }
+
+                return _hasLift ? Page.None : Page.Lifts;
             }
         }
 
@@ -479,6 +556,20 @@ namespace SnowBound.Hud
         void Update()
         {
             if (_canvas == null || !_canvas.enabled) return;
+
+            Page suggested = Suggested;
+
+            foreach (var pair in _tabs)
+            {
+                Color rest = pair.Key == _page ? UITheme.CardActive
+                           : pair.Key == suggested ? UITheme.CardHover
+                           : UITheme.Card;
+
+                pair.Value.SetRestColour(rest);
+                pair.Value.labelColour = pair.Key == suggested ? UITheme.Ice : UITheme.Ink;
+            }
+
+            if (!PageOpen) { _status.text = string.Empty; return; }
 
             float cash = ledger != null ? ledger.Cash : 0f;
 
