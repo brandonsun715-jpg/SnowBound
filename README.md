@@ -26,9 +26,8 @@ Assets/
     Editor/               editor-only tools (scene builder menu)
     Buildings/            resort buildings (lodge today, more with the tycoon)
     Lifts/                chairlift path, chairs and operation
-    Game/                 loop rules: gear rack, run timing
+    Game/                 loop rules, modes, management camera, selection, building
     Resort/               the tycoon layer: clock, money, facilities, demand, guests
-    Game/                 modes, the management camera, world selection
     Weather/              sky, snowfall, snow conditions
     Audio/                what the ride and the lift sound like
     UI/                   the interface
@@ -75,8 +74,14 @@ Milestone 2 is complete.
 1. **Economy** — cash, a resort day, revenue, upkeep, end-of-day figures. *(done)*
 2. **Guests** — NPCs who arrive, buy tickets, ride the lift, ski and leave. *(done)*
 3. **Resort rating** out of five, from weighted factors. *(done)*
-4. Building system: place a lodge, rental, restaurant, shop, ticket booth.
-5. Upgrade system for the lift, lodge, trails and park.
+4. **Building system** — pick a building, position it on the mountain, pay for
+   it, and it opens. *(done)*
+5. **Upgrade system** — every facility, including the ones you built, has
+   levels that cost money and change what it does. *(done)*
+6. **Trail building** — cut a new run of a chosen grade into the mountain.
+   *(done)*
+
+Milestone 3 is complete.
 
 ## Building the scene
 
@@ -100,7 +105,17 @@ props after changing generator settings.
 | Middle mouse drag | Rotate |
 | Left click | Select a lift, building, trail or guest |
 | `Tab` | Facilities and upgrades |
+| BUILD / TERRAIN | Open the build menu |
 | ENTER MOUNTAIN | Fly down and take control |
+
+**Placing something**
+
+| Input | Action |
+|---|---|
+| Move the mouse | Position it. Green is allowed, red is not, and it says why |
+| Left click | Place it and pay |
+| `R` | Rotate a building by 45° |
+| `Esc` / right click | Put it back down |
 
 **On foot**
 
@@ -203,7 +218,25 @@ was created with; picking the wrong one leaves every button silently dead.
   so what the player sees and what the books say cannot disagree.
 - A `Facility` answers three questions and no others: what it costs to run,
   how good it is, and what its level does. Money, rating and the upgrade menu
-  read those answers rather than knowing what a chairlift is.
+  read those answers rather than knowing what a chairlift is. A building the
+  player puts down is a `Facility`, which is the entire reason it is
+  selectable, inspectable, upgradeable, billed and counted towards the rating
+  without any of those systems being told about it.
+- A building is a `BuildingDefinition` — a name, a price, a footprint, three
+  colours and what it earns. Adding a building to the game is adding an entry
+  to `BuildingCatalogue`, not writing a class.
+- The placement ghost is the real building wearing a translucent skin, so
+  what you position is exactly what you get. Placement is refused before any
+  money moves, and the refusal says which rule was broken: too steep, on the
+  piste, too far from the runs, too close to something else, or too dear.
+- Cutting a new run adds a `PisteDefinition` and rebuilds the mountain. The
+  terrain already carves towards whichever run is nearest, so a new run is
+  data plus a rebuild rather than sculpting. The preview ribbon is drawn from
+  the same definition the real run will use.
+- `Escape` steps back exactly one level — put down what you are holding, then
+  close what is open, then come off the mountain — and `HudDirector` is the
+  only place that decides what one level means. Nothing else reads the key,
+  which is why one press never does two things.
 - The mountain holds a list of `PisteDefinition`s rather than one run. They
   fan out from the base area, spread apart through the middle and converge
   again at the summit, so one lift serves all of them. The terrain carves
@@ -249,6 +282,17 @@ was created with; picking the wrong one leaves every button silently dead.
 - `MountainGenerator` is the single source of truth for ground height.
   Other systems call `SampleHeight(x, z)`, `PisteCenterX(z)` and
   `PistePoint(z)` instead of guessing or raycasting.
+- `FarRange` puts ridges and peaks out to nearly two kilometres so the resort
+  sits in a mountain range instead of on a slab in a void. Inside the playable
+  rectangle it hides a few metres under the real terrain rather than being cut
+  out, which means no hole to keep in sync and no seam along the join. It has
+  no colliders and casts no shadows: it is scenery.
+- If the game looks pixelated, check the **Scale** slider at the top of the
+  Game view. Anything above `1x` renders at a fraction of the resolution and
+  magnifies the result. On a Retina Mac, also turn off **Low Resolution
+  Aspect Ratios** in the same menu. `SnowBound → Improve Render Quality` sets
+  the pipeline side: full render scale, 4× MSAA and a shadow distance that
+  reaches the far side of the piste.
 - Generated geometry uses `HideFlags.DontSave`, so the scene file stays
   small. `MountainGenerator` and `MountainProps` are `[ExecuteAlways]`, so the
   mountain rebuilds itself whenever the scene loads, scripts recompile, or you

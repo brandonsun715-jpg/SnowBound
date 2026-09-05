@@ -18,6 +18,7 @@ namespace SnowBound.Hud
     {
         public ModeDirector modes;
         public ManagementScreen overview;
+        public BuildPanel build;
         public Ledger ledger;
         public ResortClock clock;
         public ResortTraffic traffic;
@@ -39,6 +40,7 @@ namespace SnowBound.Hud
         {
             if (modes == null) modes = ModeDirector.Instance;
             if (overview == null) overview = FindAnyObjectByType<ManagementScreen>();
+            if (build == null) build = FindAnyObjectByType<BuildPanel>();
             if (ledger == null) ledger = Ledger.Instance;
             if (clock == null) clock = ResortClock.Instance;
             if (traffic == null) traffic = FindAnyObjectByType<ResortTraffic>();
@@ -248,19 +250,38 @@ namespace SnowBound.Hud
 
         // ---------------- running ----------------------------------------------
 
+        /// <summary>
+        /// One screen at a time. Opening either of the two big panels closes
+        /// the other, so the mountain is never buried under both at once.
+        /// </summary>
         void Choose(string category)
         {
-            if (overview == null) return;
-
-            if (category == "FACILITIES" || category == "UPGRADES")
+            if (category == "BUILD" || category == "TERRAIN")
             {
-                if (overview.IsOpen) overview.Close(); else overview.Open();
+                if (overview != null) overview.Close();
                 _note.text = string.Empty;
+
+                if (build == null) { _note.text = UITheme.Track("BUILD MENU IS MISSING"); return; }
+
+                if (build.IsOpen) build.Close(); else build.Open();
                 return;
             }
 
-            overview.Close();
-            _note.text = UITheme.Track(category + " ARRIVES WITH THE BUILDING SYSTEM");
+            if (category == "FACILITIES" || category == "UPGRADES" || category == "LIFTS")
+            {
+                if (build != null) build.Close();
+                _note.text = string.Empty;
+
+                if (overview == null) return;
+
+                if (overview.IsOpen) overview.Close(); else overview.Open();
+                return;
+            }
+
+            if (overview != null) overview.Close();
+            if (build != null) build.Close();
+
+            _note.text = UITheme.Track(category + " ARRIVES IN A LATER UPDATE");
         }
 
         void Update()

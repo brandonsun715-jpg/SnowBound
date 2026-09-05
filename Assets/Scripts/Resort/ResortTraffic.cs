@@ -69,7 +69,17 @@ namespace SnowBound.Resort
 
                 float total = 0f;
                 for (int i = 0; i < _facilities.Length; i++)
-                    if (_facilities[i] != null) total += _facilities[i].DailyUpkeep;
+                {
+                    Facility facility = _facilities[i];
+                    if (facility == null) continue;
+
+                    // A building still being positioned has not been paid for
+                    // and does not cost anything to run yet.
+                    var placed = facility as SnowBound.Buildings.PlacedBuilding;
+                    if (placed != null && placed.ghost) continue;
+
+                    total += facility.DailyUpkeep;
+                }
 
                 return total;
             }
@@ -81,12 +91,21 @@ namespace SnowBound.Resort
             if (ledger == null) ledger = Ledger.Instance;
             if (weather == null) weather = WeatherSystem.Instance;
 
-            _facilities = FindObjectsByType<Facility>(FindObjectsSortMode.None);
-            _lodge = FindAnyObjectByType<LodgeFacility>();
-            _park = FindAnyObjectByType<ParkFacility>();
+            Rescan();
             _ratingSource = ResortRating.Instance;
 
             if (clock != null) _lastChargedHour = clock.opensAt;
+        }
+
+        /// <summary>
+        /// Re-read what the resort owns. Called after something is built, so
+        /// a new building starts costing money the hour after it opens.
+        /// </summary>
+        public void Rescan()
+        {
+            _facilities = FindObjectsByType<Facility>(FindObjectsSortMode.None);
+            _lodge = FindAnyObjectByType<LodgeFacility>();
+            _park = FindAnyObjectByType<ParkFacility>();
         }
 
         void Update()

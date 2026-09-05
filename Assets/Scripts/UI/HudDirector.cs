@@ -22,6 +22,9 @@ namespace SnowBound.Hud
         public SkiHud skiHud;
         public ManagementHud managementHud;
         public ManagementScreen overview;
+        public BuildPanel build;
+        public BuildController builder;
+        public TrailBuilder trails;
         public DaySummary summary;
         public NotificationStack notifications;
         public ResortRating rating;
@@ -40,6 +43,9 @@ namespace SnowBound.Hud
             if (skiHud == null) skiHud = FindAnyObjectByType<SkiHud>();
             if (managementHud == null) managementHud = FindAnyObjectByType<ManagementHud>();
             if (overview == null) overview = FindAnyObjectByType<ManagementScreen>();
+            if (build == null) build = FindAnyObjectByType<BuildPanel>();
+            if (builder == null) builder = FindAnyObjectByType<BuildController>();
+            if (trails == null) trails = FindAnyObjectByType<TrailBuilder>();
             if (summary == null) summary = FindAnyObjectByType<DaySummary>();
             if (notifications == null) notifications = FindAnyObjectByType<NotificationStack>();
             if (rating == null) rating = ResortRating.Instance;
@@ -54,6 +60,7 @@ namespace SnowBound.Hud
             {
                 Dress(false, false);
                 if (overview != null) overview.Close();
+                if (build != null) build.Close();
                 return;
             }
 
@@ -74,16 +81,28 @@ namespace SnowBound.Hud
             if (managementHud != null) managementHud.SetVisible(management);
 
             // Nothing but the world during a transition.
-            if (!management && overview != null && overview.IsOpen) overview.Close();
+            if (management) return;
+
+            if (overview != null && overview.IsOpen) overview.Close();
+            if (build != null && build.IsOpen) build.Close();
         }
 
+        /// <summary>
+        /// Escape steps back exactly one level, and this is the only place
+        /// that decides what one level means: put down what you are holding,
+        /// then close what is open, then come off the mountain.
+        /// </summary>
         void ReadShortcuts(bool managing, bool riding)
         {
-            // Escape steps back one level: out of a panel, then off the mountain.
             if (ManagementInput.BackPressed)
             {
-                if (managing && overview != null && overview.IsOpen) overview.Close();
-                else if (riding && modes != null) modes.EnterManagement();
+                if (builder != null && builder.Placing) { builder.Cancel(); return; }
+                if (trails != null && trails.Planning) { trails.Cancel(); return; }
+
+                if (managing && build != null && build.IsOpen) { build.Close(); return; }
+                if (managing && overview != null && overview.IsOpen) { overview.Close(); return; }
+
+                if (riding && modes != null) modes.EnterManagement();
                 return;
             }
 
@@ -92,6 +111,8 @@ namespace SnowBound.Hud
 
             if (riding && modes != null) { modes.EnterManagement(); return; }
             if (!managing || overview == null) return;
+
+            if (build != null) build.Close();
 
             if (overview.IsOpen) overview.Close();
             else overview.Open();

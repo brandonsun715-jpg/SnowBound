@@ -67,6 +67,28 @@ namespace SnowBound.Game
             }
         }
 
+        public static bool RotatePressed
+        {
+            get
+            {
+                var k = Keyboard.current;
+                return k != null && k.rKey.wasPressedThisFrame;
+            }
+        }
+
+        /// <summary>
+        /// Right mouse. Escape is deliberately not here: one press should undo
+        /// one thing, and HudDirector is the only place that knows the order.
+        /// </summary>
+        public static bool CancelPressed
+        {
+            get
+            {
+                var m = Mouse.current;
+                return m != null && m.rightButton.wasPressedThisFrame;
+            }
+        }
+
 #else
 
         public static Vector2 Pan
@@ -83,6 +105,9 @@ namespace SnowBound.Game
         }
 
         public static bool BackPressed { get { return Input.GetKeyDown(KeyCode.Escape); } }
+        public static bool RotatePressed { get { return Input.GetKeyDown(KeyCode.R); } }
+
+        public static bool CancelPressed { get { return Input.GetMouseButtonDown(1); } }
 
 #endif
     }

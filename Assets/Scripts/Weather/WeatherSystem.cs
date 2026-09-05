@@ -50,8 +50,8 @@ namespace SnowBound.Weather
         [Header("Visibility")]
         public Color clearFog = new Color(0.72f, 0.80f, 0.88f);
         public Color stormFog = new Color(0.80f, 0.82f, 0.86f);
-        public float clearFogDensity = 0.0018f;
-        public float stormFogDensity = 0.011f;
+        public float clearFogDensity = 0.0009f;
+        public float stormFogDensity = 0.0065f;
 
         [Header("Light")]
         public Light sun;

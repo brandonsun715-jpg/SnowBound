@@ -170,14 +170,36 @@ namespace SnowBound.Mountain
         public float PisteCenterX(int index, float z)
         {
             if (index < 0 || index >= PisteCount) return 0f;
+            return CenterXFor(pistes[index], z);
+        }
 
-            PisteDefinition piste = pistes[index];
+        /// <summary>
+        /// Centre line of any run definition, including one that is only being
+        /// proposed. The trail planner draws its preview with this.
+        /// </summary>
+        public float CenterXFor(PisteDefinition piste, float z)
+        {
+            if (piste == null) return 0f;
+
             float spread = PisteSpread(z);
 
             return piste.anchorX
                  + piste.spreadX * spread
                  + Mathf.Sin(z * piste.snakeFrequency + piste.snakePhase)
                    * piste.snakeAmplitude * spread;
+        }
+
+        /// <summary>Add a run and reshape the mountain around it.</summary>
+        public void AddPiste(PisteDefinition piste)
+        {
+            if (piste == null) return;
+
+            var grown = new PisteDefinition[PisteCount + 1];
+            for (int i = 0; i < PisteCount; i++) grown[i] = pistes[i];
+            grown[PisteCount] = piste;
+
+            pistes = grown;
+            Build();
         }
 
         /// <summary>Half width of run <paramref name="index"/> (wider near the base).</summary>
@@ -376,6 +398,10 @@ namespace SnowBound.Mountain
         [ContextMenu("Build Now")]
         public void Build()
         {
+            // The terrain is about to move, so anything measured off it is stale.
+            _lengthCache.Clear();
+            _verticalCache.Clear();
+
             if (transform.position != Vector3.zero ||
                 transform.rotation != Quaternion.identity ||
                 transform.localScale != Vector3.one)

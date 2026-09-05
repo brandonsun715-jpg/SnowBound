@@ -124,10 +124,46 @@ namespace SnowBound.Resort
             if (_guests.Count >= maxLiveGuests || mountain == null)
             {
                 BookVirtualSpending();
+                BookBuildingTrade(null);
                 return;
             }
 
             Spawn();
+        }
+
+        /// <summary>
+        /// Every building the player put down takes its own cut of a guest.
+        /// The building decides whether it gets one and how much, so adding a
+        /// building never means changing this.
+        /// </summary>
+        void BookBuildingTrade(Guest guest)
+        {
+            if (ledger == null) return;
+
+            for (int i = 0; i < PlacedBuilding.All.Count; i++)
+            {
+                PlacedBuilding building = PlacedBuilding.All[i];
+                if (building == null) continue;
+
+                float amount = building.Trade();
+                if (amount <= 0f) continue;
+
+                ledger.Earn(building.Line, amount);
+                if (guest != null) guest.money -= amount;
+            }
+        }
+
+        /// <summary>Amenities put people in a better mood just by being there.</summary>
+        public float AmenityHappiness()
+        {
+            float total = 0f;
+            for (int i = 0; i < PlacedBuilding.All.Count; i++)
+            {
+                PlacedBuilding building = PlacedBuilding.All[i];
+                if (building != null) total += building.HappinessBonus;
+            }
+
+            return Mathf.Min(total, 0.22f);
         }
 
         void BookVirtualSpending()
@@ -158,13 +194,14 @@ namespace SnowBound.Resort
             var guest = go.AddComponent<Guest>();
             guest.ability = Mathf.Clamp01(Random.value * 0.85f + 0.1f);
             guest.money = Random.Range(90f, 320f);
-            guest.happiness = Random.Range(0.60f, 0.85f);
+            guest.happiness = Mathf.Clamp01(Random.Range(0.60f, 0.85f) + AmenityHappiness());
             guest.gear = Random.value < 0.32f ? LocomotionKind.Snowboard : LocomotionKind.Ski;
             guest.preferredPiste = ChoosePiste(guest.ability);
 
             guest.Begin(this, ArrivalPoint(), skis, board);
 
             _guests.Add(guest);
+            BookBuildingTrade(guest);
         }
 
         /// <summary>Better skiers pick the harder run; beginners stay on the blue.</summary>

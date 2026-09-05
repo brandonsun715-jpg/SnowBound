@@ -14,7 +14,6 @@ using SnowBound.Hud;
 using SnowBound.Weather;
 using SnowBound.Audio;
 using SnowBound.Resort;
-using SnowBound.Game;
 
 namespace SnowBound.EditorTools
 {
@@ -107,6 +106,9 @@ namespace SnowBound.EditorTools
             var props = gen.GetComponent<MountainProps>();
             if (props != null) props.Build();
 
+            var far = Object.FindAnyObjectByType<FarRange>();
+            if (far != null) far.Build();
+
             var park = Object.FindAnyObjectByType<TerrainPark>();
             if (park != null) park.Build();
 
@@ -143,8 +145,19 @@ namespace SnowBound.EditorTools
             cam.transform.position = new Vector3(0f, 28f, -75f);
             cam.transform.rotation = Quaternion.Euler(8f, 0f, 0f);
             cam.clearFlags = CameraClearFlags.Skybox;
-            cam.farClipPlane = 1500f;
+            cam.farClipPlane = 6000f;
             cam.nearClipPlane = 0.1f;
+
+            // Multisampling handles the geometry; SMAA cleans up the rest of
+            // the crawling edges, which is most of what reads as pixelation on
+            // a mountain full of thin trees and lift cable.
+            var data = cam.GetUniversalAdditionalCameraData();
+            if (data != null)
+            {
+                data.renderPostProcessing = true;
+                data.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing;
+                data.antialiasingQuality = AntialiasingQuality.High;
+            }
         }
 
         static void ConfigureSun()
@@ -173,7 +186,7 @@ namespace SnowBound.EditorTools
         {
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
-            RenderSettings.fogDensity = 0.0025f;
+            RenderSettings.fogDensity = 0.0009f;
             RenderSettings.fogColor = new Color(0.72f, 0.80f, 0.88f);
 
             // Cool sky bounce, slightly warmer bounce off the snow.
@@ -199,6 +212,8 @@ namespace SnowBound.EditorTools
 
             // The park lives on its own object. Sharing the mountain's would
             // make clicking the snow indistinguishable from clicking the park.
+            go.AddComponent<FarRange>().Build();
+
             var parkObject = new GameObject("Terrain Park");
             parkObject.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
             parkObject.AddComponent<TerrainPark>().Build();
@@ -254,6 +269,8 @@ namespace SnowBound.EditorTools
             go.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
             go.AddComponent<SelectionController>();
             go.AddComponent<ModeDirector>();
+            go.AddComponent<BuildController>();
+            go.AddComponent<TrailBuilder>();
         }
 
         static void CreateWeather()
@@ -288,6 +305,7 @@ namespace SnowBound.EditorTools
             go.AddComponent<NotificationStack>();
             go.AddComponent<ManagementScreen>();
             go.AddComponent<ManagementHud>();
+            go.AddComponent<BuildPanel>();
             go.AddComponent<InspectorPanel>();
             go.AddComponent<DaySummary>();
             go.AddComponent<HudDirector>();

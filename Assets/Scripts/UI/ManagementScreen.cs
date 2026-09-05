@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using SnowBound.Buildings;
 using SnowBound.Resort;
 
 namespace SnowBound.Hud
@@ -34,6 +35,7 @@ namespace SnowBound.Hud
 
         class Card
         {
+            public RectTransform root;
             public Facility facility;
             public Text level;
             public Text summary;
@@ -44,6 +46,16 @@ namespace SnowBound.Hud
         }
 
         readonly List<Card> _cards = new List<Card>();
+
+        RectTransform _cardHost;
+        Text _pageLabel;
+        UIButton _older, _newer;
+        int _page;
+
+        const int PerPage = 3;
+        const float CardWidth = 336f;
+        const float CardStride = 356f;
+        const float CardLeft = 510f;
 
         void Start()
         {
@@ -64,6 +76,10 @@ namespace SnowBound.Hud
         public void Open()
         {
             if (_panel == null) return;
+
+            // Something may have been built since this was last opened.
+            if (FacilityCount() != _cards.Count) Rebuild();
+
             Refresh();
             _panel.Show();
         }
@@ -94,7 +110,13 @@ namespace SnowBound.Hud
 
             BuildHeading(layer);
             BuildRatingPanel(layer);
-            BuildFacilityCards(layer);
+            BuildFacilityHeader(layer);
+
+            // The cards themselves live in their own node so the whole set can
+            // be thrown away and rebuilt when the player puts something up.
+            _cardHost = UIBuilder.Stretch(UIBuilder.Node(layer, "Facilities"));
+            BuildFacilityCards(_cardHost);
+
             BuildFooter(layer);
         }
 
@@ -119,7 +141,7 @@ namespace SnowBound.Hud
             RectTransform panel = UIBuilder.Glass(layer, "RatingPanel", new Vector2(0f, 1f),
                                                   new Vector2(0f, 1f),
                                                   new Vector2(UITheme.Margin, -238f),
-                                                  new Vector2(430f, 414f));
+                                                  new Vector2(430f, 460f));
 
             var topLeft = new Vector2(0f, 1f);
 
@@ -171,29 +193,141 @@ namespace SnowBound.Hud
             }
         }
 
-        void BuildFacilityCards(Transform layer)
+        void BuildFacilityHeader(Transform layer)
+        {
+            Text caption = UIBuilder.Label(layer, "FacilitiesCaption", UITheme.Micro, UITheme.InkFaint,
+                                           TextAnchor.UpperLeft);
+            UIBuilder.Place(caption.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f),
+                            new Vector2(CardLeft, -232f), new Vector2(500f, 18f));
+            caption.text = UITheme.Track("FACILITIES");
+
+            _pageLabel = UIBuilder.Label(layer, "Page", UITheme.Micro, UITheme.InkFaint,
+                                         TextAnchor.MiddleCenter);
+            UIBuilder.Place(_pageLabel.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f),
+                            new Vector2(CardLeft + 1000f, -240f), new Vector2(70f, 22f));
+
+            _older = Arrow(layer, "Older", CardLeft + 950f, "<", -1);
+            _newer = Arrow(layer, "Newer", CardLeft + 1078f, ">", 1);
+        }
+
+        UIButton Arrow(Transform layer, string name, float x, string glyph, int step)
+        {
+            RectTransform button = UIBuilder.Place(UIBuilder.Node(layer, name),
+                                                   new Vector2(0f, 1f), new Vector2(0f, 1f),
+                                                   new Vector2(x, -240f), new Vector2(40f, 26f));
+            UIPointer.Block(button);
+
+            var fill = button.gameObject.AddComponent<Image>();
+            fill.sprite = UISprites.Fill(UITheme.RadiusSmall);
+            fill.type = Image.Type.Sliced;
+            fill.color = UITheme.Card;
+
+            var border = UIBuilder.Stretch(UIBuilder.Node(button, "Hairline"))
+                                  .gameObject.AddComponent<Image>();
+            border.sprite = UISprites.Outline(UITheme.RadiusSmall, 1);
+            border.type = Image.Type.Sliced;
+            border.color = UITheme.Hairline;
+            border.raycastTarget = false;
+
+            Text label = UIBuilder.Label(button, "Label", UITheme.Label, UITheme.Ink,
+                                         TextAnchor.MiddleCenter, FontStyle.Bold);
+            UIBuilder.Stretch(label.rectTransform);
+            label.text = glyph;
+
+            var control = button.gameObject.AddComponent<UIButton>();
+            control.background = fill;
+            control.border = border;
+            control.label = label;
+            control.SetRestColour(UITheme.Card);
+
+            int delta = step;
+            control.Clicked += () => Turn(delta);
+
+            return control;
+        }
+
+        void BuildFacilityCards(Transform host)
         {
             Facility[] facilities = FindObjectsByType<Facility>(FindObjectsSortMode.None);
             System.Array.Sort(facilities, (a, b) => string.CompareOrdinal(a.displayName, b.displayName));
 
-            Text caption = UIBuilder.Label(layer, "FacilitiesCaption", UITheme.Micro, UITheme.InkFaint,
-                                           TextAnchor.UpperLeft);
-            UIBuilder.Place(caption.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                            new Vector2(510f, -232f), new Vector2(500f, 18f));
-            caption.text = UITheme.Track("FACILITIES");
-
             for (int i = 0; i < facilities.Length; i++)
             {
-                _cards.Add(BuildCard(layer, facilities[i], 510f + i * 356f));
+                if (Ghost(facilities[i])) continue;
+                _cards.Add(BuildCard(host, facilities[i], 0f));
             }
+
+            _page = Mathf.Clamp(_page, 0, Mathf.Max(0, Pages - 1));
+            LayoutCards();
+        }
+
+        /// <summary>A building still being positioned is not a facility yet.</summary>
+        static bool Ghost(Facility facility)
+        {
+            var placed = facility as PlacedBuilding;
+            return placed != null && placed.ghost;
+        }
+
+        static int FacilityCount()
+        {
+            Facility[] all = FindObjectsByType<Facility>(FindObjectsSortMode.None);
+
+            int count = 0;
+            for (int i = 0; i < all.Length; i++) if (!Ghost(all[i])) count++;
+
+            return count;
+        }
+
+        int Pages { get { return Mathf.Max(1, Mathf.CeilToInt(_cards.Count / (float)PerPage)); } }
+
+        void Turn(int delta)
+        {
+            _page = Mathf.Clamp(_page + delta, 0, Pages - 1);
+            LayoutCards();
+        }
+
+        /// <summary>Three cards at a time, so they never run off the screen.</summary>
+        void LayoutCards()
+        {
+            for (int i = 0; i < _cards.Count; i++)
+            {
+                Card card = _cards[i];
+                if (card.root == null) continue;
+
+                int column = i - _page * PerPage;
+                bool visible = column >= 0 && column < PerPage;
+
+                card.root.gameObject.SetActive(visible);
+                if (visible)
+                    card.root.anchoredPosition = new Vector2(CardLeft + column * CardStride, -258f);
+            }
+
+            if (_pageLabel != null) _pageLabel.text = UITheme.Track((_page + 1) + " / " + Pages);
+            if (_older != null) _older.interactable = _page > 0;
+            if (_newer != null) _newer.interactable = _page < Pages - 1;
+        }
+
+        /// <summary>Throw the cards away and read the resort again.</summary>
+        void Rebuild()
+        {
+            for (int i = _cardHost.childCount - 1; i >= 0; i--)
+            {
+                GameObject child = _cardHost.GetChild(i).gameObject;
+                child.SetActive(false);
+                Destroy(child);
+            }
+
+            _cards.Clear();
+            BuildFacilityCards(_cardHost);
         }
 
         Card BuildCard(Transform layer, Facility facility, float x)
         {
             RectTransform card = UIBuilder.Glass(layer, facility.displayName + "Card",
                                                  new Vector2(0f, 1f), new Vector2(0f, 1f),
-                                                 new Vector2(x, -258f), new Vector2(336f, 352f),
+                                                 new Vector2(x, -258f), new Vector2(CardWidth, 352f),
                                                  UITheme.Radius, UITheme.Card);
+            UIPointer.Block(card);
 
             var topLeft = new Vector2(0f, 1f);
 
@@ -206,7 +340,7 @@ namespace SnowBound.Hud
                             new Vector2(UITheme.Pad + 36f, -UITheme.Pad - 2f), new Vector2(260f, 28f));
             name.text = facility.displayName.ToUpperInvariant();
 
-            var result = new Card { facility = facility };
+            var result = new Card { root = card, facility = facility };
 
             result.level = UIBuilder.Label(card, "Level", UITheme.Micro, UITheme.Ice,
                                            TextAnchor.UpperLeft);
@@ -290,6 +424,7 @@ namespace SnowBound.Hud
             if (facility is LiftFacility) return UIIcons.Lift;
             if (facility is ParkFacility) return UIIcons.Park;
             if (facility is LodgeFacility) return UIIcons.Lodge;
+            if (facility is PlacedBuilding) return UIIcons.Lodge;
             return UIIcons.Mountain;
         }
 
@@ -335,7 +470,11 @@ namespace SnowBound.Hud
                 }
             }
 
-            for (int i = 0; i < _cards.Count; i++) RefreshCard(_cards[i]);
+            for (int i = 0; i < _cards.Count; i++)
+            {
+                if (_cards[i].root != null && !_cards[i].root.gameObject.activeSelf) continue;
+                RefreshCard(_cards[i]);
+            }
         }
 
         void RefreshCard(Card card)
@@ -347,7 +486,7 @@ namespace SnowBound.Hud
             card.summary.text = facility.LevelSummary;
             card.upkeep.text = Ledger.Money(facility.DailyUpkeep) + " per day";
 
-            float full = 336f - UITheme.Pad * 2f;
+            float full = CardWidth - UITheme.Pad * 2f;
             card.qualityBar.rectTransform.sizeDelta =
                 new Vector2(Mathf.Max(4f, full * facility.Quality), 4f);
 

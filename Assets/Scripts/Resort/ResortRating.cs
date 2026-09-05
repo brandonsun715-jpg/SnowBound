@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using SnowBound.Buildings;
 using SnowBound.Mountain;
 using SnowBound.Weather;
 
@@ -64,6 +65,7 @@ namespace SnowBound.Resort
             _factors.Add(new Factor { name = "Variety", weight = 0.12f });
             _factors.Add(new Factor { name = "Conditions", weight = 0.11f });
             _factors.Add(new Factor { name = "Terrain Park", weight = 0.08f });
+            _factors.Add(new Factor { name = "Amenities", weight = 0.10f });
         }
 
         void Start()
@@ -101,7 +103,7 @@ namespace SnowBound.Resort
 
         void Measure()
         {
-            if (_factors.Count < 7) return;
+            if (_factors.Count < 8) return;
 
             _factors[0].value = _lift != null ? _lift.Quality : 0.2f;
             _factors[1].value = Trails();
@@ -110,6 +112,31 @@ namespace SnowBound.Resort
             _factors[4].value = Variety();
             _factors[5].value = Conditions();
             _factors[6].value = _park != null ? _park.Quality : 0f;
+            _factors[7].value = Amenities();
+        }
+
+        /// <summary>
+        /// What the player has built. Breadth counts as much as quality: one
+        /// excellent restaurant is not a resort, five decent buildings are.
+        /// </summary>
+        float Amenities()
+        {
+            float quality = 0f;
+            int counted = 0;
+
+            for (int i = 0; i < PlacedBuilding.All.Count; i++)
+            {
+                PlacedBuilding building = PlacedBuilding.All[i];
+                if (building == null || building.ghost) continue;
+
+                quality += building.Quality;
+                counted++;
+            }
+
+            if (counted == 0) return 0f;
+
+            float breadth = Mathf.Clamp01(counted / 4f);
+            return Mathf.Clamp01(quality / counted * (0.45f + 0.55f * breadth));
         }
 
         float Trails()
