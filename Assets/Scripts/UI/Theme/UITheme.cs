@@ -58,9 +58,9 @@ namespace SnowBound.Hud
         public const int Hero = 48;
         public const int Title = 32;
         public const int Heading = 23;
-        public const int Body = 19;
-        public const int Label = 14;
-        public const int Micro = 12;
+        public const int Body = 20;
+        public const int Label = 16;
+        public const int Micro = 13;
 
         // ---- rhythm ------------------------------------------------------
 

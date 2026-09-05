@@ -4,6 +4,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 using SnowBound.Mountain;
 using SnowBound.Buildings;
 using SnowBound.Player;
@@ -53,6 +54,40 @@ namespace SnowBound.EditorTools
             EditorSceneManager.SaveScene(scene, ScenePath);
 
             Debug.Log("[SnowBound] Mountain scene built and saved to " + ScenePath);
+        }
+
+        /// <summary>
+        /// Render quality lives on the pipeline asset rather than in the
+        /// scene, so it survives rebuilding the scene and has to be set
+        /// separately. Full render scale, four times multisampling, and a
+        /// shadow distance that actually reaches the far side of the piste.
+        /// </summary>
+        [MenuItem("SnowBound/Improve Render Quality", false, 40)]
+        public static void ImproveRenderQuality()
+        {
+            var asset = GraphicsSettings.defaultRenderPipeline as UniversalRenderPipelineAsset;
+            if (asset == null) asset = QualitySettings.renderPipeline as UniversalRenderPipelineAsset;
+
+            if (asset == null)
+            {
+                Debug.LogWarning("[SnowBound] No URP asset found. Is this project still on URP?");
+                return;
+            }
+
+            asset.renderScale = 1f;
+            asset.msaaSampleCount = 4;
+            asset.shadowDistance = 260f;
+            asset.shadowCascadeCount = 3;
+
+            QualitySettings.antiAliasing = 4;
+            QualitySettings.vSyncCount = 1;
+
+            EditorUtility.SetDirty(asset);
+            AssetDatabase.SaveAssets();
+
+            Debug.Log("[SnowBound] Render scale 1.0, MSAA 4x, shadow distance 260 m. " +
+                      "If the game still looks soft, check the Game view Scale slider is at 1x " +
+                      "and that Low Resolution Aspect Ratios is off.");
         }
 
         [MenuItem("SnowBound/Rebuild Mountain In Open Scene", false, 20)]

@@ -44,7 +44,11 @@ namespace SnowBound.Hud
 
             var scaler = go.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            // Designed against 1600x900 rather than 1080p, so the whole
+            // interface is a fifth larger relative to the window. Text that
+            // survives a small window is worth more than text that is
+            // perfectly proportioned on a monitor nobody is using.
+            scaler.referenceResolution = new Vector2(1600f, 900f);
             // Match height rather than width, so an ultrawide window gains
             // empty space at the sides instead of shrinking everything.
             scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
