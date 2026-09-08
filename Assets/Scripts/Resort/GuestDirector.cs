@@ -82,9 +82,9 @@ namespace SnowBound.Resort
             _jackets = new Material[7];
             for (int i = 0; i < _jackets.Length; i++) _jackets[i] = GuestAppearance.Jacket(i);
 
-            _trousers = MaterialFactory.Create("GuestTrousers", new Color(0.14f, 0.16f, 0.24f), 0.15f);
-            _skin = MaterialFactory.Create("GuestHelmet", new Color(0.16f, 0.17f, 0.20f), 0.32f);
-            _gear = MaterialFactory.Create("GuestGear", new Color(0.30f, 0.62f, 0.82f), 0.35f);
+            _trousers = Surfaces.Fabric("GuestTrousers", new Color(0.14f, 0.16f, 0.24f));
+            _skin = Surfaces.Painted("GuestHelmet", new Color(0.16f, 0.17f, 0.20f));
+            _gear = Surfaces.Painted("GuestGear", new Color(0.30f, 0.62f, 0.82f));
 
             if (traffic != null)
             {

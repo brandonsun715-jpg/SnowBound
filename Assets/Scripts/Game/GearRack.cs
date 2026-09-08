@@ -70,9 +70,9 @@ namespace SnowBound.Game
             root.transform.SetParent(transform, false);
             root.transform.SetPositionAndRotation(Point, Quaternion.Euler(0f, lodge.facingYaw, 0f));
 
-            Material timber = MaterialFactory.Create("RackTimber", new Color(0.30f, 0.21f, 0.14f), 0.06f);
-            Material ski = MaterialFactory.Create("RackSki", new Color(0.20f, 0.62f, 0.85f), 0.35f);
-            Material board = MaterialFactory.Create("RackBoard", new Color(0.85f, 0.62f, 0.16f), 0.35f);
+            Material timber = Surfaces.DarkTimber;
+            Material ski = Surfaces.Painted("Ski", new Color(0.20f, 0.62f, 0.85f));
+            Material board = Surfaces.Painted("Board", new Color(0.85f, 0.62f, 0.16f));
 
             // A-frame rack.
             for (int side = -1; side <= 1; side += 2)
@@ -100,14 +100,8 @@ namespace SnowBound.Game
         void Bar(Transform parent, string name, Vector3 local, Vector3 scale,
                  Quaternion rotation, Material mat)
         {
-            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            go.name = name;
-            go.transform.SetParent(parent, false);
-            go.transform.localPosition = local;
+            GameObject go = Boxes.Create(parent, name, local, scale, mat);
             go.transform.localRotation = rotation;
-            go.transform.localScale = scale;
-            go.GetComponent<MeshRenderer>().sharedMaterial = mat;
-            Kill(go.GetComponent<Collider>());
         }
 
         void Update()

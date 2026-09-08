@@ -286,6 +286,11 @@ namespace SnowBound.EditorTools
                 if (light.type == LightType.Directional) { system.sun = light; break; }
             }
 
+            // Everything that decides how the mountain looks, in one object.
+            go.AddComponent<LightingDirector>();
+            go.AddComponent<SkySystem>();
+            go.AddComponent<PostProcessing>();
+
             var snow = go.AddComponent<Snowfall>();
             snow.weather = system;
 
@@ -381,7 +386,15 @@ namespace SnowBound.EditorTools
 
             var go = new GameObject("Lodge");
             go.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
-            go.AddComponent<LodgeBuilder>().Build();
+
+            var lodge = go.AddComponent<LodgeBuilder>();
+            lodge.Build();
+
+            // The real building stands where the placeholder is, at the size
+            // the placeholder was, and the placeholder keeps its colliders and
+            // its entrance point. Nothing downstream knows the difference.
+            // It measures the placeholder itself, so there is nothing to set.
+            go.AddComponent<HeroModel>();
         }
     }
 }

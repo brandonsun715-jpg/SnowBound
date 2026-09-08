@@ -69,7 +69,14 @@ namespace SnowBound.Core
             mesh.SetVertices(_vertices);
             mesh.subMeshCount = _slots.Length;
             for (int i = 0; i < _slots.Length; i++) mesh.SetTriangles(_slots[i], i);
+
+            // Batched geometry is welded from meshes that were never unwrapped,
+            // so it gets the same world-space projection everything else does.
+            // Without it a textured material on the forest is a flat colour.
+            PrimitiveMeshes.ProjectUVs(mesh);
+
             mesh.RecalculateNormals();
+            mesh.RecalculateTangents();
             mesh.RecalculateBounds();
 
             go.AddComponent<MeshFilter>().sharedMesh = mesh;

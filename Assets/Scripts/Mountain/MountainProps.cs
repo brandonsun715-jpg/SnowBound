@@ -137,14 +137,13 @@ namespace SnowBound.Mountain
             Piece trunk, needles, snow;
             BuildPine(out trunk, out needles, out snow);
 
-            Material bark = MaterialFactory.Create("Bark", new Color(0.24f, 0.17f, 0.12f), 0.05f);
-            Material snowMat = MaterialFactory.Create("TreeSnow", new Color(0.95f, 0.96f, 1f), 0.28f);
-            var needleShades = new[]
-            {
-                MaterialFactory.Create("NeedlesA", new Color(0.09f, 0.23f, 0.15f), 0.05f),
-                MaterialFactory.Create("NeedlesB", new Color(0.13f, 0.28f, 0.19f), 0.05f),
-                MaterialFactory.Create("NeedlesC", new Color(0.10f, 0.21f, 0.21f), 0.05f)
-            };
+            Material bark = Surfaces.Bark;
+            Material snowMat = Surfaces.Settled;
+
+            // Three species rather than three shades of one. Spruce is dark and
+            // blue, fir is warmer, pine is greyer, and a forest of all three
+            // reads as a forest instead of as one tree stamped nine hundred times.
+            var needleShades = new[] { Surfaces.Spruce, Surfaces.Fir, Surfaces.Pine };
 
             var batch = new MeshBatcher(parent, "Forest",
                 new[] { bark, needleShades[0], needleShades[1], needleShades[2], snowMat });
@@ -208,8 +207,8 @@ namespace SnowBound.Mountain
             boulder.verts.AddRange(sphere.vertices);
             boulder.tris.AddRange(sphere.triangles);
 
-            Material rockMat = MaterialFactory.Create("Rock", new Color(0.34f, 0.34f, 0.36f), 0.08f);
-            Material capMat = MaterialFactory.Create("RockSnow", new Color(0.94f, 0.95f, 1f), 0.30f);
+            Material rockMat = Surfaces.Rock;
+            Material capMat = Surfaces.Settled;
 
             var batch = new MeshBatcher(parent, "Rocks", new[] { rockMat, capMat });
 
@@ -277,10 +276,10 @@ namespace SnowBound.Mountain
 
             // Outer edge orange as they are on a real mountain; inner edge in
             // the run's own grade colour, so you can read which run you are on.
-            Material orange = MaterialFactory.Create("MarkerOrange", new Color(0.95f, 0.42f, 0.05f), 0.1f);
-            Material green = MaterialFactory.Create("MarkerGreen", new Color(0.10f, 0.62f, 0.28f), 0.1f);
-            Material blue = MaterialFactory.Create("MarkerBlue", new Color(0.10f, 0.35f, 0.85f), 0.1f);
-            Material red = MaterialFactory.Create("MarkerRed", new Color(0.82f, 0.11f, 0.13f), 0.1f);
+            Material orange = Surfaces.Painted("MarkerOrange", new Color(0.95f, 0.42f, 0.05f));
+            Material green = Surfaces.Painted("MarkerGreen", new Color(0.10f, 0.62f, 0.28f));
+            Material blue = Surfaces.Painted("MarkerBlue", new Color(0.10f, 0.35f, 0.85f));
+            Material red = Surfaces.Painted("MarkerRed", new Color(0.82f, 0.11f, 0.13f));
 
             var batch = new MeshBatcher(parent, "PisteMarkers", new[] { orange, green, blue, red });
 

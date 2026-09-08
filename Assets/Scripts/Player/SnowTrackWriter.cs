@@ -64,7 +64,8 @@ namespace SnowBound.Player
             container.hideFlags = HideFlags.DontSaveInEditor;
             _container = container.transform;
 
-            _material = MaterialFactory.Create("SnowTrack", new Color(0.74f, 0.79f, 0.89f), 0.05f);
+            _material = MaterialFactory.CreateSurface("SnowTrack", ProceduralTextures.Packed(),
+                                                      new Color(0.80f, 0.84f, 0.92f), 2.4f, 1.4f);
         }
 
         void Update()

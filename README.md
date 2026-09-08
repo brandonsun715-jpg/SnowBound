@@ -101,6 +101,27 @@ undeveloped mountain and some cash.
 6. **Interface** — one top bar, one tool dock, one inspector rail, laid out so
    they cannot overlap at any aspect ratio. *(done)*
 
+## Milestone 5 — the technical art pass
+
+The prototype's real visual bottleneck was not the geometry. It was that
+every surface in the game was an untextured flat colour and there was no
+post-processing at all.
+
+1. **Procedural PBR surfaces** — every material now has a base map, a normal
+   map and a metallic-smoothness map, all generated in code. *(done)*
+2. **A snow material system** — powder, packed, groomed corduroy, ice, wind
+   slab and mixed, each a different surface rather than a different shade of
+   white. *(done)*
+3. **Texture coordinates** — the generated geometry had none at all, so a
+   textured material on it would have rendered as one flat texel. *(done)*
+4. **Lighting** — a continuous model driven by sun elevation and weather
+   rather than a set of presets. *(done)*
+5. **Sky** — atmospheric scattering with a drifting cloud sheet over it.
+   *(done)*
+6. **Grade** — a restrained colour pipeline built in code. *(done)*
+7. **Hero assets** — a real lodge model, fitted to the placeholder it
+   replaces. *(done)*
+
 ## Building the scene
 
 Top menu bar → **SnowBound → Build Mountain Scene**. This creates the scene,
@@ -323,6 +344,44 @@ was created with; picking the wrong one leaves every button silently dead.
 - `MountainGenerator` is the single source of truth for ground height.
   Other systems call `SampleHeight(x, z)`, `PisteCenterX(z)` and
   `PistePoint(z)` instead of guessing or raycasting.
+- **Every surface is arithmetic.** The project imports no textures, so
+  `Core/ProceduralTextures` writes them: a height field, a colour, a metallic
+  value and a smoothness value per texel, with the normal map derived from the
+  height afterwards. One pass, so the normal is guaranteed to agree with the
+  albedo because they came out of the same function. Everything is cached, so
+  a surface is generated once for the life of the game and shared.
+- Snow is not one material. Powder is fine-grained and almost matte, packed is
+  firmer and catches light, ice is smooth and blue and reflective, wind slab
+  has sastrugi in it, and a groomed run has corduroy — even ridges left by a
+  winch cat, running down the fall line. That last one is the single detail
+  that says "ski resort" at a glance.
+- None of the generated geometry was ever unwrapped, and a mesh with no
+  texture coordinates samples the same texel everywhere — so a textured
+  material on it looks exactly like the flat colour it replaced. Everything
+  now gets a per-triangle world-space projection in metres, which is not a
+  real unwrap but on boxes, prisms, tubes and terrain is indistinguishable
+  from one. Boxes are built at their real size rather than scaled from a unit
+  cube, for the same reason: texel density has to match or the materials stop
+  reading as one world.
+- Lighting is two numbers — how high the sun is and how bad the weather is —
+  and everything else is derived. Presets snap; a mountain that snaps from
+  clear to overcast never feels like weather. A low sun means light through
+  far more air, so it is warm, weak and reddened, with cold blue shadow
+  filling in from the sky: that single relationship is most of what makes a
+  sunset look like a sunset without painting orange over the screen.
+- The sky is real scattering rather than a painted gradient, so thickening the
+  atmosphere as the sun drops produces the sunset because that is what
+  scattering does. A cloud sheet drifts over it on the wind.
+- The grade is deliberately restrained. A snow scene is almost entirely made
+  of the brightest value there is, so anything heavy-handed either clips it to
+  white or drags it to grey. Neutral film response, exposure that follows the
+  light, and bloom kept below the threshold where snow starts to glow.
+- A hero model replaces a placeholder without replacing it: the placeholder
+  keeps its colliders, its entrance point and everything the game reads off
+  it, and only its renderers are switched off. The model measures the
+  placeholder and fits itself to it, so swapping an asset in cannot break
+  where the player spawns or what anything collides with, and no magic scale
+  number is needed per asset.
 - **The height field is the mountain.** One array of heights; the chunk meshes
   are built from it and each chunk's collider is that same mesh; `SampleHeight`
   is the same bilinear interpolation the triangles perform. So the surface you

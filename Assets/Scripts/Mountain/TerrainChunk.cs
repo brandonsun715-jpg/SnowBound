@@ -37,15 +37,19 @@ namespace SnowBound.Mountain
         readonly List<Vector2> _uvs = new List<Vector2>();
         readonly List<int> _surface = new List<int>();
 
-        readonly List<int> _snow = new List<int>();
-        readonly List<int> _rock = new List<int>();
-        readonly List<int> _groomed = new List<int>();
-        readonly List<int> _powder = new List<int>();
+        /// <summary>
+        /// One list per surface. Six is more than a terrain usually needs, but
+        /// corduroy, powder, ice and bare rock are genuinely different
+        /// materials and putting them on one shared texture is exactly what
+        /// made the mountain read as a single white sheet.
+        /// </summary>
+        const int Surfaces = 6;
+
+        readonly List<int>[] _faces = new List<int>[Surfaces];
 
         public static TerrainChunk Create(Transform parent, string name,
                                           int x0, int z0, int x1, int z1,
-                                          Material snow, Material rock,
-                                          Material groomed, Material powder)
+                                          Material[] surfaces)
         {
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
@@ -58,7 +62,9 @@ namespace SnowBound.Mountain
             chunk._filter = go.GetComponent<MeshFilter>();
             chunk._collider = go.GetComponent<MeshCollider>();
             chunk._renderer = go.GetComponent<MeshRenderer>();
-            chunk._renderer.sharedMaterials = new[] { snow, rock, groomed, powder };
+            chunk._renderer.sharedMaterials = surfaces;
+
+            for (int i = 0; i < Surfaces; i++) chunk._faces[i] = new List<int>();
 
             return chunk;
         }
@@ -87,7 +93,7 @@ namespace SnowBound.Mountain
             if (nx < 2 || nz < 2) return;
 
             _verts.Clear(); _normals.Clear(); _uvs.Clear(); _surface.Clear();
-            _snow.Clear(); _rock.Clear(); _groomed.Clear(); _powder.Clear();
+            for (int i = 0; i < Surfaces; i++) _faces[i].Clear();
 
             for (int iz = 0; iz < nz; iz++)
             {
@@ -106,7 +112,10 @@ namespace SnowBound.Mountain
                     // their shared edge and the seam does not show.
                     _normals.Add(mountain.NormalAtIndex(gx, gz));
 
-                    _uvs.Add(new Vector2(x / 12f, z / 12f));
+                    // World metres. The materials decide their own tiling from
+                    // that, so "eight metres per tile of corduroy" is a number
+                    // written once in one place and not divided into the mesh.
+                    _uvs.Add(new Vector2(x, z));
                     _surface.Add(mountain.SurfaceAtIndex(gx, gz));
                 }
             }
@@ -133,11 +142,12 @@ namespace SnowBound.Mountain
             _mesh.SetVertices(_verts);
             _mesh.SetNormals(_normals);
             _mesh.SetUVs(0, _uvs);
-            _mesh.subMeshCount = 4;
-            _mesh.SetTriangles(_snow, 0);
-            _mesh.SetTriangles(_rock, 1);
-            _mesh.SetTriangles(_groomed, 2);
-            _mesh.SetTriangles(_powder, 3);
+            _mesh.subMeshCount = Surfaces;
+            for (int i = 0; i < Surfaces; i++) _mesh.SetTriangles(_faces[i], i);
+
+            // Normal mapping needs tangents, and the terrain has real normal
+            // maps on it now. Without these the snow is flat again.
+            _mesh.RecalculateTangents();
             _mesh.RecalculateBounds();
 
             _filter.sharedMesh = _mesh;
@@ -168,26 +178,26 @@ namespace SnowBound.Mountain
 
         /// <summary>
         /// A triangle belongs to a run if any of its corners does, and a run is
-        /// always snow however steep it is. Off the runs, snow settles on
-        /// gentle ground and slides off steep ground, so a face past the rock
-        /// angle is drawn as bare rock.
+        /// always snow however steep it is.
         /// </summary>
         void Sort(MountainGenerator mountain, int a, int b, int c)
         {
             int surface = Mathf.Max(_surface[a], Mathf.Max(_surface[b], _surface[c]));
 
-            List<int> target;
-
-            if (surface == 2) target = _groomed;
-            else if (surface == 3) target = _powder;
-            else
+            if (surface == 0)
             {
+                // Off the runs, snow settles on gentle ground and slides off
+                // steep ground, so a face past the rock angle is bare stone.
                 Vector3 normal = Vector3.Cross(_verts[b] - _verts[a], _verts[c] - _verts[a]);
-                bool steep = normal.sqrMagnitude > 1e-10f &&
-                             Vector3.Angle(normal.normalized, Vector3.up) > mountain.rockAngle;
 
-                target = steep ? _rock : _snow;
+                if (normal.sqrMagnitude > 1e-10f &&
+                    Vector3.Angle(normal.normalized, Vector3.up) > mountain.rockAngle)
+                {
+                    surface = 1;
+                }
             }
+
+            List<int> target = _faces[Mathf.Clamp(surface, 0, Surfaces - 1)];
 
             target.Add(a);
             target.Add(b);

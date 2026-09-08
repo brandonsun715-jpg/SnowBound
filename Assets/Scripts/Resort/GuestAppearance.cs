@@ -82,7 +82,7 @@ namespace SnowBound.Resort
                 new Color(0.32f, 0.34f, 0.40f)
             };
 
-            return MaterialFactory.Create("GuestJacket" + index, palette[index % palette.Length], 0.15f);
+            return Surfaces.Fabric("GuestJacket" + index, palette[index % palette.Length]);
         }
     }
 }

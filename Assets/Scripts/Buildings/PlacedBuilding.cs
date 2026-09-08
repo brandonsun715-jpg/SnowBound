@@ -61,9 +61,13 @@ namespace SnowBound.Buildings
 
         public void Raise()
         {
-            _wall = MaterialFactory.Create("BuildWall", definition.wall, 0.06f);
-            _roof = MaterialFactory.Create("BuildRoof", definition.roof, 0.10f);
-            _trim = MaterialFactory.Create("BuildTrim", definition.trim, 0.30f);
+            _wall = MaterialFactory.CreateSurface("BuildWall" + definition.name,
+                        ProceduralTextures.Wood(definition.name, definition.wall,
+                                                definition.wall * 0.45f),
+                        Color.white, 3f, 1.2f);
+
+            _roof = Surfaces.Painted("BuildRoof" + definition.name, definition.roof);
+            _trim = Surfaces.Painted("BuildTrim" + definition.name, definition.trim);
             _glow = MaterialFactory.CreateEmissive("BuildWindow",
                         new Color(0.95f, 0.78f, 0.45f), new Color(1f, 0.74f, 0.34f) * 2f);
 
@@ -126,21 +130,12 @@ namespace SnowBound.Buildings
 
         void Box(string name, Vector3 position, Vector3 size, Material material, bool solid)
         {
-            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            go.name = name;
-            go.transform.SetParent(transform, false);
-            go.transform.localPosition = position;
-            go.transform.localScale = size;
+            GameObject go = Boxes.Create(transform, name, position, size, material, solid);
 
             AddRenderer(go, material);
 
-            var collider = go.GetComponent<Collider>();
-            if (solid) { _colliders.Add(collider); return; }
-
-            // Destroy is deferred a frame, so switch it off now as well: a
-            // ghost must never catch the ray that is positioning it.
-            collider.enabled = false;
-            Destroy(collider);
+            if (!solid) return;
+            _colliders.Add(go.GetComponent<Collider>());
         }
 
         /// <summary>

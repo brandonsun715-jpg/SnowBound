@@ -123,12 +123,12 @@ namespace SnowBound.Buildings
             root.transform.localPosition = new Vector3(positionX, LowestGround(rot), positionZ);
             root.transform.localRotation = rot;
 
-            Material stone = MaterialFactory.Create("LodgeStone", new Color(0.34f, 0.33f, 0.32f), 0.08f);
-            Material wood = MaterialFactory.Create("LodgeWood", new Color(0.44f, 0.29f, 0.19f), 0.06f);
-            Material darkWood = MaterialFactory.Create("LodgeTimber", new Color(0.18f, 0.12f, 0.08f), 0.06f);
-            Material deckWood = MaterialFactory.Create("LodgeDeck", new Color(0.36f, 0.25f, 0.17f), 0.06f);
-            Material roofMat = MaterialFactory.Create("LodgeRoof", new Color(0.16f, 0.15f, 0.18f), 0.10f);
-            Material snowMat = MaterialFactory.Create("LodgeRoofSnow", new Color(0.95f, 0.96f, 1f), 0.30f);
+            Material stone = Surfaces.Stone;
+            Material wood = Surfaces.Timber;
+            Material darkWood = Surfaces.DarkTimber;
+            Material deckWood = Surfaces.Timber;
+            Material roofMat = Surfaces.Painted("Roof", new Color(0.17f, 0.16f, 0.19f));
+            Material snowMat = Surfaces.Settled;
             Material glass = MaterialFactory.CreateEmissive("LodgeWindow",
                                  new Color(0.95f, 0.75f, 0.42f), new Color(1f, 0.72f, 0.32f) * 2.2f);
             Material lampGlow = MaterialFactory.CreateEmissive("LodgeLamp",
@@ -290,17 +290,9 @@ namespace SnowBound.Buildings
         GameObject Box(Transform parent, string name, Vector3 localCenter, Vector3 size,
                        Material mat, bool keepCollider)
         {
-            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            go.name = name;
-            go.transform.SetParent(parent, false);
-            go.transform.localPosition = localCenter;
-            go.transform.localScale = size;
-            go.GetComponent<MeshRenderer>().sharedMaterial = mat;
-
-            // Thin decorative pieces would only snag the player.
-            if (!keepCollider) Kill(go.GetComponent<BoxCollider>());
-
-            return go;
+            // Built at its real size rather than a scaled unit cube, so the
+            // timber on a fifteen metre wall is fifteen metres of timber.
+            return Boxes.Create(parent, name, localCenter, size, mat, keepCollider);
         }
     }
 }

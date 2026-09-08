@@ -120,6 +120,86 @@ namespace SnowBound.Core
         }
 
         /// <summary>
+        /// A box with its own vertices per face, so every face takes its own
+        /// texture projection and the corners stay crisp.
+        /// </summary>
+        public static void AddBox(List<Vector3> verts, List<int> tris, Vector3 centre, Vector3 size)
+        {
+            Vector3 h = size * 0.5f;
+
+            Vector3 a = centre + new Vector3(-h.x, -h.y, -h.z);
+            Vector3 b = centre + new Vector3(h.x, -h.y, -h.z);
+            Vector3 c = centre + new Vector3(h.x, -h.y, h.z);
+            Vector3 d = centre + new Vector3(-h.x, -h.y, h.z);
+
+            Vector3 e = centre + new Vector3(-h.x, h.y, -h.z);
+            Vector3 f = centre + new Vector3(h.x, h.y, -h.z);
+            Vector3 g = centre + new Vector3(h.x, h.y, h.z);
+            Vector3 i = centre + new Vector3(-h.x, h.y, h.z);
+
+            AddQuad(verts, tris, e, f, g, i);   // top
+            AddQuad(verts, tris, d, c, b, a);   // bottom
+            AddQuad(verts, tris, a, b, f, e);   // front
+            AddQuad(verts, tris, c, d, i, g);   // back
+            AddQuad(verts, tris, d, a, e, i);   // left
+            AddQuad(verts, tris, b, c, g, f);   // right
+        }
+
+        /// <summary>
+        /// Texture coordinates in metres, projected per triangle onto whichever
+        /// axis that triangle faces.
+        ///
+        /// None of the geometry in this game is unwrapped, and a mesh with no
+        /// UVs samples the same single texel everywhere — so a textured
+        /// material on it looks like a flat colour, which is exactly what it
+        /// was supposed to stop being. Projecting from world position is not a
+        /// real unwrap, but on boxes, prisms, tubes and terrain it is
+        /// indistinguishable from one, and it costs nothing to author.
+        /// </summary>
+        public static void ProjectUVs(Mesh mesh)
+        {
+            if (mesh == null || mesh.vertexCount == 0) return;
+
+            Vector3[] verts = mesh.vertices;
+            var uvs = new Vector2[verts.Length];
+
+            for (int sub = 0; sub < mesh.subMeshCount; sub++)
+            {
+                int[] tris = mesh.GetTriangles(sub);
+
+                for (int t = 0; t + 2 < tris.Length; t += 3)
+                {
+                    int i0 = tris[t], i1 = tris[t + 1], i2 = tris[t + 2];
+
+                    Vector3 n = Vector3.Cross(verts[i1] - verts[i0], verts[i2] - verts[i0]);
+
+                    float ax = Mathf.Abs(n.x), ay = Mathf.Abs(n.y), az = Mathf.Abs(n.z);
+
+                    if (ay >= ax && ay >= az)
+                    {
+                        uvs[i0] = new Vector2(verts[i0].x, verts[i0].z);
+                        uvs[i1] = new Vector2(verts[i1].x, verts[i1].z);
+                        uvs[i2] = new Vector2(verts[i2].x, verts[i2].z);
+                    }
+                    else if (ax >= az)
+                    {
+                        uvs[i0] = new Vector2(verts[i0].z, verts[i0].y);
+                        uvs[i1] = new Vector2(verts[i1].z, verts[i1].y);
+                        uvs[i2] = new Vector2(verts[i2].z, verts[i2].y);
+                    }
+                    else
+                    {
+                        uvs[i0] = new Vector2(verts[i0].x, verts[i0].y);
+                        uvs[i1] = new Vector2(verts[i1].x, verts[i1].y);
+                        uvs[i2] = new Vector2(verts[i2].x, verts[i2].y);
+                    }
+                }
+            }
+
+            mesh.uv = uvs;
+        }
+
+        /// <summary>
         /// Finishes a mesh. Pass one triangle list per sub-mesh; the renderer's
         /// material slots line up with the order you pass them in.
         /// </summary>
@@ -131,7 +211,9 @@ namespace SnowBound.Core
             mesh.SetVertices(verts);
             mesh.subMeshCount = subMeshes.Length;
             for (int i = 0; i < subMeshes.Length; i++) mesh.SetTriangles(subMeshes[i], i);
+            ProjectUVs(mesh);
             mesh.RecalculateNormals();
+            mesh.RecalculateTangents();
             mesh.RecalculateBounds();
             mesh.hideFlags = HideFlags.DontSave;
             return mesh;

@@ -233,12 +233,12 @@ namespace SnowBound.Lifts
             var root = new GameObject(ContainerName);
             root.transform.SetParent(transform, false);
 
-            Material steel = MaterialFactory.Create("LiftSteel", new Color(0.55f, 0.57f, 0.60f), 0.45f, 0.6f);
-            Material cable = MaterialFactory.Create("LiftCable", new Color(0.18f, 0.19f, 0.21f), 0.35f);
-            Material shell = MaterialFactory.Create("LiftShell", new Color(0.22f, 0.25f, 0.30f), 0.25f);
+            Material steel = Surfaces.Galvanised;
+            Material cable = Surfaces.Steel;
+            Material shell = Surfaces.Painted("LiftShell", new Color(0.24f, 0.27f, 0.32f));
             // Slate, not red: the rider's jacket is red and the two were
             // blending into one another on the chair.
-            Material chairMat = MaterialFactory.Create("LiftChair", new Color(0.22f, 0.28f, 0.38f), 0.25f);
+            Material chairMat = Surfaces.Painted("LiftChair", new Color(0.20f, 0.27f, 0.38f));
 
             BuildTowers(root.transform, line, steel);
             BuildTerminals(root.transform, line, steel, shell);

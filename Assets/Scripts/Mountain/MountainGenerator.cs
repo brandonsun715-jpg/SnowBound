@@ -88,10 +88,8 @@ namespace SnowBound.Mountain
         public float rollerLength = 26f;
 
         [Header("Look")]
-        public Material snowMaterial;
-        public Material rockMaterial;
-        public Material groomedMaterial;
-        public Material powderMaterial;
+        [Tooltip("Leave empty to use the generated snow and rock surfaces.")]
+        public Material[] surfaceOverrides;
         [Tooltip("Faces steeper than this show bare rock. A run never does.")]
         [Range(20f, 75f)] public float rockAngle = 36f;
 
@@ -123,7 +121,6 @@ namespace SnowBound.Mountain
         Transform _container;
         readonly List<TerrainChunk> _chunks = new List<TerrainChunk>();
 
-        Material _runtimeSnow, _runtimeRock, _runtimeGroomed, _runtimePowder;
         bool _noiseReady;
         float _nOffX, _nOffZ, _rOffX, _rOffZ;
 
@@ -184,12 +181,27 @@ namespace SnowBound.Mountain
             return new Vector3(hL - hR, 2f * Mathf.Max(_cellX, _cellZ), hD - hU).normalized;
         }
 
-        /// <summary>Which surface a vertex belongs to: 0 snow, 2 groomed run, 3 loose run.</summary>
+        /// <summary>
+        /// Which of the six terrain surfaces a vertex wears.
+        ///
+        /// 0 off-piste, 1 rock, 2 groomed corduroy, 3 powder, 4 ice, 5 mixed.
+        /// A groomed run always shows corduroy whatever snow fell on it,
+        /// because that is what grooming does to snow.
+        /// </summary>
         public int SurfaceAtIndex(int ix, int iz)
         {
             Trail trail = TrailAtIndex(ix, iz);
             if (trail == null) return 0;
-            return trail.groomed ? 2 : 3;
+
+            if (trail.groomed) return 2;
+
+            switch (trail.snow)
+            {
+                case SnowQuality.Powder:
+                case SnowQuality.FreshPowder: return 3;
+                case SnowQuality.Icy: return 4;
+                default: return 5;
+            }
         }
 
         public Trail TrailAtIndex(int ix, int iz)
@@ -1032,14 +1044,7 @@ namespace SnowBound.Mountain
             container.layer = gameObject.layer;
             _container = container.transform;
 
-            Material snow = Resolve(ref _runtimeSnow, snowMaterial,
-                                    "SnowRuntime", new Color(0.93f, 0.95f, 1f), 0.30f);
-            Material rock = Resolve(ref _runtimeRock, rockMaterial,
-                                    "RockRuntime", new Color(0.30f, 0.29f, 0.29f), 0.06f);
-            Material groomed = Resolve(ref _runtimeGroomed, groomedMaterial,
-                                       "GroomedRuntime", new Color(0.97f, 0.98f, 1f), 0.44f);
-            Material powder = Resolve(ref _runtimePowder, powderMaterial,
-                                      "PowderRuntime", new Color(0.90f, 0.93f, 1f), 0.16f);
+            Material[] surfaces = SurfaceSet();
 
             int cells = Mathf.Max(8, chunkCells);
 
@@ -1051,16 +1056,33 @@ namespace SnowBound.Mountain
                     int z1 = Mathf.Min(z0 + cells, _nz - 1);
 
                     _chunks.Add(TerrainChunk.Create(_container, "Chunk " + x0 + "_" + z0,
-                                                    x0, z0, x1, z1, snow, rock, groomed, powder));
+                                                    x0, z0, x1, z1, surfaces));
                 }
             }
         }
 
-        Material Resolve(ref Material cache, Material assigned, string name, Color colour, float smooth)
+        /// <summary>
+        /// The six terrain materials, in the order SurfaceAtIndex names them.
+        /// Real textured surfaces unless the scene overrides them.
+        /// </summary>
+        Material[] SurfaceSet()
         {
-            if (assigned != null) return assigned;
-            if (cache == null) cache = MaterialFactory.Create(name, colour, smooth);
-            return cache;
+            var set = new[]
+            {
+                Core.Surfaces.OffPiste,
+                Core.Surfaces.Cliff,
+                Core.Surfaces.Groomed,
+                Core.Surfaces.Powder,
+                Core.Surfaces.Icy,
+                Core.Surfaces.Mixed
+            };
+
+            if (surfaceOverrides == null) return set;
+
+            for (int i = 0; i < set.Length && i < surfaceOverrides.Length; i++)
+                if (surfaceOverrides[i] != null) set[i] = surfaceOverrides[i];
+
+            return set;
         }
 
         void RebuildRegion(int x0, int z0, int x1, int z1, bool cookCollision = true)

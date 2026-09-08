@@ -121,13 +121,18 @@ namespace SnowBound.Mountain
             _mesh.subMeshCount = 2;
             _mesh.SetTriangles(snow, 0);
             _mesh.SetTriangles(rock, 1);
+
+            SnowBound.Core.PrimitiveMeshes.ProjectUVs(_mesh);
             _mesh.RecalculateNormals();
+            _mesh.RecalculateTangents();
             _mesh.RecalculateBounds();
 
             if (_snow == null)
-                _snow = MaterialFactory.Create("FarSnow", new Color(0.88f, 0.91f, 0.97f), 0.24f);
+                _snow = MaterialFactory.CreateSurface("FarSnow", ProceduralTextures.Windblown(),
+                                                      new Color(0.94f, 0.96f, 1f), 90f, 0.7f);
             if (_rock == null)
-                _rock = MaterialFactory.Create("FarRock", new Color(0.29f, 0.29f, 0.31f), 0.05f);
+                _rock = MaterialFactory.CreateSurface("FarRock", ProceduralTextures.Rock(),
+                                                      new Color(0.78f, 0.79f, 0.83f), 70f, 0.9f);
 
             go.AddComponent<MeshFilter>().sharedMesh = _mesh;
 

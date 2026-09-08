@@ -59,10 +59,10 @@ namespace SnowBound.Player
             var root = new GameObject(ContainerName);
             root.transform.SetParent(transform, false);
 
-            Material jacketMat = MaterialFactory.Create("PlayerJacket", jacket, 0.15f);
-            Material trouserMat = MaterialFactory.Create("PlayerTrousers", trousers, 0.15f);
-            Material helmetMat = MaterialFactory.Create("PlayerHelmet", helmet, 0.35f);
-            Material gearMat = MaterialFactory.Create("PlayerGear", gear, 0.35f);
+            Material jacketMat = Surfaces.Fabric("PlayerJacket", jacket);
+            Material trouserMat = Surfaces.Fabric("PlayerTrousers", trousers);
+            Material helmetMat = Surfaces.Painted("PlayerHelmet", helmet);
+            Material gearMat = Surfaces.Painted("PlayerGear", gear);
 
             BuildBody(root.transform, jacketMat, trouserMat, helmetMat, gearMat);
             BuildSkis(root.transform, gearMat, helmetMat);

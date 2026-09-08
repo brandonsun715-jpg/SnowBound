@@ -84,9 +84,9 @@ namespace SnowBound.Game
             var root = new GameObject(ContainerName);
             root.transform.SetParent(transform, false);
 
-            Material post = MaterialFactory.Create("GatePost", new Color(0.22f, 0.23f, 0.26f), 0.2f);
-            Material startBanner = MaterialFactory.Create("StartBanner", new Color(0.13f, 0.55f, 0.30f), 0.2f);
-            Material finishBanner = MaterialFactory.Create("FinishBanner", new Color(0.80f, 0.16f, 0.16f), 0.2f);
+            Material post = Surfaces.Galvanised;
+            Material startBanner = Surfaces.Fabric("StartBanner", new Color(0.13f, 0.55f, 0.30f));
+            Material finishBanner = Surfaces.Fabric("FinishBanner", new Color(0.80f, 0.16f, 0.16f));
 
             Gate(root.transform, top, run.halfWidth, post, startBanner);
             Gate(root.transform, bottom, run.halfWidth, post, finishBanner);
@@ -122,13 +122,8 @@ namespace SnowBound.Game
 
         void Piece(Transform parent, string name, Vector3 position, Vector3 scale, Material mat)
         {
-            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            go.name = name;
-            go.transform.SetParent(parent, false);
+            GameObject go = Boxes.Create(parent, name, Vector3.zero, scale, mat);
             go.transform.position = position;
-            go.transform.localScale = scale;
-            go.GetComponent<MeshRenderer>().sharedMaterial = mat;
-            Kill(go.GetComponent<Collider>());
         }
 
         void Update()

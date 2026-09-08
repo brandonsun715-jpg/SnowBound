@@ -88,10 +88,10 @@ namespace SnowBound.Mountain
             var root = new GameObject(ContainerName);
             root.transform.SetParent(transform, false);
 
-            Material rideOn = MaterialFactory.Create("ParkSnow", new Color(0.96f, 0.97f, 1f), 0.34f);
-            Material shaded = MaterialFactory.Create("ParkSnowShade", new Color(0.72f, 0.78f, 0.90f), 0.22f);
-            Material steel = MaterialFactory.Create("ParkSteel", new Color(0.30f, 0.32f, 0.36f), 0.45f, 0.5f);
-            Material slick = MaterialFactory.Create("ParkBoxTop", new Color(0.66f, 0.69f, 0.74f), 0.68f, 0.3f);
+            Material rideOn = Surfaces.Groomed;
+            Material shaded = Surfaces.Packed;
+            Material steel = Surfaces.Painted("ParkSteel", new Color(0.28f, 0.30f, 0.34f));
+            Material slick = Surfaces.Steel;
 
             BuildKickers(root.transform, rideOn, shaded);
             BuildBoxes(root.transform, steel, slick);
@@ -255,13 +255,11 @@ namespace SnowBound.Mountain
             float span = along.magnitude;
             if (span < 0.1f) return;
 
-            var slab = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            slab.name = name;
-            slab.transform.SetParent(root, false);
+            GameObject slab = Boxes.Create(root, name, Vector3.zero,
+                                           new Vector3(boxWidth, 0.22f, span), slick, true);
+
             slab.transform.position = (top + bottom) * 0.5f;
             slab.transform.rotation = Quaternion.LookRotation(along / span, Vector3.up);
-            slab.transform.localScale = new Vector3(boxWidth, 0.22f, span);
-            slab.GetComponent<MeshRenderer>().sharedMaterial = slick;
 
             // Steel and plastic do not hold you back the way snow does.
             slab.AddComponent<SlickSurface>();
@@ -276,14 +274,10 @@ namespace SnowBound.Mountain
             float ground = mountain.SampleHeight(under.x, under.z);
             float height = Mathf.Max(0.2f, under.y - ground);
 
-            var leg = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            leg.name = "BoxLeg";
-            leg.transform.SetParent(root, false);
-            leg.transform.position = new Vector3(under.x, ground + height * 0.5f, under.z);
-            leg.transform.localScale = new Vector3(boxWidth * 0.75f, height, 0.16f);
-            leg.GetComponent<MeshRenderer>().sharedMaterial = steel;
+            GameObject leg = Boxes.Create(root, "BoxLeg", Vector3.zero,
+                                          new Vector3(boxWidth * 0.75f, height, 0.16f), steel);
 
-            Kill(leg.GetComponent<Collider>());
+            leg.transform.position = new Vector3(under.x, ground + height * 0.5f, under.z);
         }
     }
 }
