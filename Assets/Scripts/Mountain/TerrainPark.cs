@@ -52,7 +52,16 @@ namespace SnowBound.Mountain
         [Tooltip("Extra drop across the length of the down box.")]
         public float downBoxDrop = 1.1f;
 
+        readonly GroundWatch _ground = new GroundWatch();
+
         void Start() { Build(); }
+        void OnDisable() { _ground.Stop(); }
+
+        void Update()
+        {
+            if (!Application.isPlaying) return;
+            _ground.Tick();
+        }
 
         static void Kill(Object o)
         {
@@ -98,6 +107,11 @@ namespace SnowBound.Mountain
 
             foreach (Transform tr in root.GetComponentsInChildren<Transform>(true))
                 tr.gameObject.hideFlags = HideFlags.DontSaveInEditor;
+
+            // Kickers and boxes sit on the run's surface. Regroom, re-carve or
+            // sculpt that run and they have to be rebuilt onto it.
+            _ground.Follow(mountain, Build);
+            _ground.Note(Anchor, Mathf.Max(60f, kickerSpacing * kickerCount), 8);
         }
 
         public Trail Run

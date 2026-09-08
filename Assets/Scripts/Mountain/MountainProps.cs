@@ -45,6 +45,7 @@ namespace SnowBound.Mountain
         public int seed = 777;
 
         System.Random _rnd;
+        readonly GroundWatch _ground = new GroundWatch();
 
         /// <summary>One self-contained lump of geometry, ready to be batched.</summary>
         class Piece
@@ -54,6 +55,13 @@ namespace SnowBound.Mountain
         }
 
         void Start() { Build(); }
+        void OnDisable() { _ground.Stop(); }
+
+        void Update()
+        {
+            if (!Application.isPlaying) return;
+            _ground.Tick();
+        }
 
         float Rand(float a, float b) { return a + (float)_rnd.NextDouble() * (b - a); }
 
@@ -99,6 +107,15 @@ namespace SnowBound.Mountain
             // Keep the generated clutter out of the saved scene file.
             foreach (Transform tr in container.GetComponentsInChildren<Transform>(true))
                 tr.gameObject.hideFlags = HideFlags.DontSaveInEditor;
+
+            // Every trunk was planted at the height the ground was. Carve a run
+            // under the forest and half of it is standing on air, so scatter
+            // again when the ground moves. A wide grid, because the change that
+            // matters here is usually a new trail rather than one brush stroke.
+            _ground.Follow(mountain, Build);
+            _ground.quiet = 0.75f;
+            _ground.Note(Rect.MinMaxRect(-mountain.width * 0.5f, 0f,
+                                         mountain.width * 0.5f, mountain.length), 24);
         }
 
         // ---------------- trees ------------------------------------------

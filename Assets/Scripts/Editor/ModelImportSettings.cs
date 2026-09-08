@@ -86,5 +86,68 @@ namespace SnowBound.EditorTools
             importer.addCollider = false;
         }
     }
+
+    /// <summary>
+    /// Applies those settings to art that was already in the project.
+    ///
+    /// A postprocessor only runs when a file is imported. Anything dropped in
+    /// before this script existed kept Unity's guesses, and there is no sign
+    /// of it: a normal map imported as a colour texture is unpacked by URP
+    /// from the wrong two channels, so the surface lights as if it were
+    /// crumpled foil — which reads, on a large pale building, as a flat grey
+    /// box. The fix is to reimport it, and nobody should have to know that.
+    ///
+    /// So on load, anything whose settings disagree with what the
+    /// postprocessor would have given it is reimported once, which puts the
+    /// postprocessor back in charge of it.
+    /// </summary>
+    [InitializeOnLoad]
+    public static class ModelImportRepair
+    {
+        static ModelImportRepair()
+        {
+            EditorApplication.delayCall += Repair;
+        }
+
+        [MenuItem("SnowBound/Reimport Model Textures", false, 42)]
+        static void Repair()
+        {
+            const string folder = "Assets/Resources/Models";
+            if (!System.IO.Directory.Exists(folder)) return;
+
+            int fixedUp = 0;
+
+            foreach (string guid in AssetDatabase.FindAssets("t:Texture2D", new[] { folder }))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+
+                var importer = AssetImporter.GetAtPath(path) as TextureImporter;
+                if (importer == null) continue;
+
+                if (!Wrong(importer, path)) continue;
+
+                AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+                fixedUp++;
+            }
+
+            if (fixedUp > 0)
+                Debug.Log("[SnowBound] Reimported " + fixedUp +
+                          " model texture(s) with the wrong import settings.");
+        }
+
+        /// <summary>Does this file disagree with what the postprocessor asks for?</summary>
+        static bool Wrong(TextureImporter importer, string path)
+        {
+            string file = System.IO.Path.GetFileNameWithoutExtension(path).ToLowerInvariant();
+
+            if (file.EndsWith("_normal"))
+                return importer.textureType != TextureImporterType.NormalMap;
+
+            if (file.EndsWith("_metallic") || file.EndsWith("_roughness") || file.EndsWith("_mask"))
+                return importer.sRGBTexture || !importer.isReadable;
+
+            return false;
+        }
+    }
 }
 #endif

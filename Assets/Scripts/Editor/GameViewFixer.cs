@@ -36,7 +36,20 @@ namespace SnowBound.EditorTools
                 return;
             }
 
-            EditorWindow view = EditorWindow.GetWindow(gameViewType, false, "Game", true);
+            // Find the window that is already open rather than asking for one.
+            // GetWindow can dock, undock or recreate it, and anything holding a
+            // reference across that — including this method — then holds a
+            // reference to a destroyed window.
+            EditorWindow view = null;
+
+            foreach (Object candidate in Resources.FindObjectsOfTypeAll(gameViewType))
+            {
+                view = candidate as EditorWindow;
+                if (view != null) break;
+            }
+
+            if (view == null) view = EditorWindow.GetWindow(gameViewType, false, "Game", false);
+
             if (view == null)
             {
                 Manual("the Game view would not open");
@@ -142,40 +155,50 @@ namespace SnowBound.EditorTools
             }
         }
 
-        /// <summary>Drag the Scale slider back to 1x. This is the one that matters.</summary>
+        /// <summary>
+        /// Drag the Scale slider back to 1x. This is the one that matters.
+        ///
+        /// Deliberately not through GameView.SnapZoom: that defers the work to
+        /// the next editor update, and if the window has been re-docked in the
+        /// meantime the deferred call runs against a destroyed one and throws.
+        /// The zoom area is set directly instead, which happens now.
+        /// </summary>
         static bool ResetZoom(Type gameViewType, EditorWindow view)
         {
             try
             {
-                // Newer editors keep it behind a property; older ones expose the
-                // zoom area directly. Try both before giving up.
-                PropertyInfo scale = gameViewType.GetProperty("defaultScale",
-                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-
-                MethodInfo snap = gameViewType.GetMethod("SnapZoom",
-                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-
-                if (snap != null)
-                {
-                    float one = scale != null ? (float)scale.GetValue(view, null) : 1f;
-                    snap.Invoke(view, new object[] { one });
-                    return true;
-                }
-
                 FieldInfo zoomField = gameViewType.GetField("m_ZoomArea",
                     BindingFlags.Instance | BindingFlags.NonPublic);
 
-                if (zoomField == null) return false;
-
-                object zoom = zoomField.GetValue(view);
+                object zoom = zoomField != null ? zoomField.GetValue(view) : null;
                 if (zoom == null) return false;
 
-                PropertyInfo zoomScale = zoom.GetType().GetProperty("scale",
-                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                Type areaType = zoom.GetType();
 
-                if (zoomScale == null || !zoomScale.CanWrite) return false;
+                // Keep the pan where it is; only the scale is wrong.
+                FieldInfo translationField = areaType.GetField("m_Translation",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
 
-                zoomScale.SetValue(zoom, Vector2.one, null);
+                var translation = translationField != null
+                    ? (Vector2)translationField.GetValue(zoom)
+                    : Vector2.zero;
+
+                MethodInfo setTransform = areaType.GetMethod("SetTransform",
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                    null, new[] { typeof(Vector2), typeof(Vector2) }, null);
+
+                if (setTransform != null)
+                {
+                    setTransform.Invoke(zoom, new object[] { translation, Vector2.one });
+                    return true;
+                }
+
+                FieldInfo scaleField = areaType.GetField("m_Scale",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+
+                if (scaleField == null) return false;
+
+                scaleField.SetValue(zoom, Vector2.one);
                 return true;
             }
             catch (Exception)

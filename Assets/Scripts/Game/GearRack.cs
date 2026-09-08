@@ -39,7 +39,10 @@ namespace SnowBound.Game
             }
         }
 
+        readonly SnowBound.Mountain.GroundWatch _ground = new SnowBound.Mountain.GroundWatch();
+
         void Start() { Build(); }
+        void OnDisable() { _ground.Stop(); }
 
         static void Kill(Object o)
         {
@@ -95,6 +98,11 @@ namespace SnowBound.Game
 
             foreach (Transform tr in root.GetComponentsInChildren<Transform>(true))
                 tr.gameObject.hideFlags = HideFlags.DontSaveInEditor;
+
+            // It stands on the lodge's pad, and the pad is only where it is
+            // until something sculpts it.
+            _ground.Follow(SnowBound.Mountain.MountainGenerator.Instance, Build);
+            _ground.Note(Point, 8f, 4);
         }
 
         void Bar(Transform parent, string name, Vector3 local, Vector3 scale,
@@ -107,6 +115,8 @@ namespace SnowBound.Game
         void Update()
         {
             if (!Application.isPlaying) return;
+
+            _ground.Tick();
 
             if (player == null) player = FindAnyObjectByType<PlayerController>();
             if (player == null || player.IsRiding) { PlayerInRange = false; return; }

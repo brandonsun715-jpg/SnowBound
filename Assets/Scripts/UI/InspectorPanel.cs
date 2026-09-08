@@ -163,14 +163,16 @@ namespace SnowBound.Hud
 
         void OnSelectionChanged(Selection selected)
         {
+            if (_panel == null) Build();
+
             if (selected == null)
             {
                 _facility = null;
-                _panel.Hide();
+                if (_panel != null) _panel.Hide();
                 return;
             }
 
-            _panel.Show();
+            if (_panel != null) _panel.Show();
             Populate(selected);
         }
 
@@ -182,6 +184,13 @@ namespace SnowBound.Hud
 
         void Populate(Selection selected)
         {
+            // The card is built at runtime and is not saved with the scene, so
+            // anything that takes the interface down — a reload, a rebuild —
+            // leaves this component alive holding references to widgets that
+            // are gone. Stand it back up rather than throwing once a frame.
+            if (_card == null || _title == null) Build();
+            if (_card == null) return;
+
             switch (selected.kind)
             {
                 case SelectionKind.Facility: ShowFacility(selected.facility); break;
@@ -207,7 +216,7 @@ namespace SnowBound.Hud
                                           Mathf.RoundToInt(60f * facility.level).ToString());
             else Rows(facility, LedgerLine.TerrainPark, "Features", facility.LevelSummary);
 
-            _stars.gameObject.SetActive(false);
+            Stars(-1f);
             ShowUpgrade(true);
         }
 
@@ -259,9 +268,7 @@ namespace SnowBound.Hud
                          + (run.groomed ? "Groomed" : "Ungroomed") + "\n"
                          + (guests != null ? guests.GuestsOn(index).ToString() : "0");
 
-            _stars.gameObject.SetActive(true);
-            if (rating != null) _stars.Set(rating.Stars * run.Appeal);
-
+            Stars(rating != null ? rating.Stars * run.Appeal : -1f);
             ShowUpgrade(false);
         }
 
@@ -297,7 +304,7 @@ namespace SnowBound.Hud
                          + suits + "\n"
                          + (reserved == null ? "No" : reserved);
 
-            _stars.gameObject.SetActive(false);
+            Stars(-1f);
             ShowUpgrade(false);
         }
 
@@ -318,8 +325,17 @@ namespace SnowBound.Hud
                          + guest.RunsCompleted + "\n"
                          + Ledger.Money(guest.money);
 
-            _stars.gameObject.SetActive(false);
+            Stars(-1f);
             ShowUpgrade(false);
+        }
+
+        /// <summary>Show a rating, or hide the row entirely with anything negative.</summary>
+        void Stars(float value)
+        {
+            if (_stars == null) return;
+
+            _stars.gameObject.SetActive(value >= 0f);
+            if (value >= 0f) _stars.Set(value);
         }
 
         static string Describe(Guest.Activity activity)
@@ -343,6 +359,8 @@ namespace SnowBound.Hud
 
         void ShowUpgrade(bool visible)
         {
+            if (_upgrade == null || _close == null) return;
+
             _upgrade.gameObject.SetActive(visible);
 
             // With nothing to upgrade, Close takes the whole row rather than

@@ -57,6 +57,7 @@ namespace SnowBound.Buildings
         }
 
         Transform _entrance;
+        readonly GroundWatch _ground = new GroundWatch();
 
         /// <summary>Front of the lodge, on the deck. Player spawn / gear swap.</summary>
         public Vector3 EntrancePosition
@@ -77,8 +78,15 @@ namespace SnowBound.Buildings
         }
 
         void OnEnable() { _instance = this; }
+        void OnDisable() { _ground.Stop(); }
 
         void Start() { Build(); }
+
+        void Update()
+        {
+            if (!Application.isPlaying) return;
+            _ground.Tick();
+        }
 
         static void Kill(Object o)
         {
@@ -145,6 +153,13 @@ namespace SnowBound.Buildings
 
             foreach (Transform tr in root.GetComponentsInChildren<Transform>(true))
                 tr.gameObject.hideFlags = HideFlags.DontSaveInEditor;
+
+            // The building stands on the ground it just measured. Watch that
+            // ground: the flattened pad is only flat until something else
+            // sculpts through it, and a lodge with daylight under one corner
+            // is worse than no lodge.
+            _ground.Follow(mountain, Build);
+            _ground.Note(here, 46f, 7);
         }
 
         /// <summary>

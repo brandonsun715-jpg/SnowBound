@@ -16,7 +16,7 @@ namespace SnowBound.Buildings
     ///
     /// The model is fitted to the placeholder rather than the other way round.
     /// An asset arrives at whatever scale its author left it in, and measuring
-    /// its own bounds and scaling to the footprint we asked for is the only
+    /// its own bounds and fitting them inside the placeholder's is the only
     /// approach that does not need someone to type a magic number per asset.
     /// </summary>
     [DefaultExecutionOrder(60)]
@@ -60,7 +60,12 @@ namespace SnowBound.Buildings
         public string Problem { get; private set; }
 
         Transform _model;
+        Bounds _fittedTo;
+        Vector3 _size;
         readonly List<Renderer> _hidden = new List<Renderer>();
+
+        /// <summary>How big the model ended up, in metres. For the console line.</summary>
+        public Vector3 Size { get { return _size; } }
 
         void Start() { Raise(); }
 
@@ -69,13 +74,25 @@ namespace SnowBound.Buildings
         void Update()
         {
             // The placeholder rebuilds itself whenever the terrain moves under
-            // it, which brings its renderers back. Twice a second is far
-            // cheaper than anyone can notice and cheaper than an event.
-            if (!Loaded || !hidePlaceholder) return;
+            // it, which brings its renderers back and can move them. Twice a
+            // second is far cheaper than anyone can notice, and cheaper than
+            // an event.
+            if (!Loaded) return;
             if (Time.unscaledTime - _checkedAt < 0.5f) return;
 
             _checkedAt = Time.unscaledTime;
-            HidePlaceholder();
+
+            Bounds now;
+            if (Placeholder(out now) && Moved(now, _fittedTo) && _model != null)
+                Fit(_model.gameObject);
+
+            if (hidePlaceholder) HidePlaceholder();
+        }
+
+        static bool Moved(Bounds a, Bounds b)
+        {
+            return (a.center - b.center).sqrMagnitude > 0.01f ||
+                   (a.size - b.size).sqrMagnitude > 0.01f;
         }
 
         [ContextMenu("Raise")]
@@ -96,12 +113,20 @@ namespace SnowBound.Buildings
             _model = instance.transform;
 
             Fit(instance);
-            Dress(instance);
+            bool dressed = Dress(instance);
 
             if (hidePlaceholder) HidePlaceholder();
 
             Loaded = true;
-            Problem = null;
+            if (dressed) Problem = null;
+
+            // Said out loud, because the two ways this goes wrong — the wrong
+            // size and no textures — both look like "a grey box" and neither
+            // says which. One line names both.
+            Debug.Log("[HeroModel] " + name + ": " + modelPath +
+                      " at " + _size.x.ToString("0.0") + " x " + _size.y.ToString("0.0") +
+                      " x " + _size.z.ToString("0.0") + " m, " +
+                      (dressed ? "textured" : "NO TEXTURES (untextured grey)"), this);
         }
 
         [ContextMenu("Clear")]
@@ -125,47 +150,107 @@ namespace SnowBound.Buildings
         }
 
         /// <summary>
-        /// Scale and stand the model on top of the placeholder it replaces.
+        /// Scale and stand the model where the placeholder is.
         ///
-        /// The placeholder's own renderers are measured, so the model inherits
-        /// its footprint, its position and its ground level without anybody
-        /// typing a number. An asset arrives at whatever scale its author left
-        /// it in; this is the only fitting approach that does not need a magic
-        /// constant per asset.
+        /// The model is fitted to the placeholder rather than the other way
+        /// round, because an asset arrives at whatever scale its author left
+        /// it in and measuring is the only approach that does not need a magic
+        /// number typed in per asset.
+        ///
+        /// It is fitted INSIDE the placeholder's box rather than stretched to
+        /// match one edge of it: the smallest of the three ratios wins, so no
+        /// axis can ever come out bigger than the building it replaces. The
+        /// first version of this matched the widest of X and Z, and a model
+        /// taller than it is wide — which this one is — came out as a thirty
+        /// metre slab standing over the trees.
+        ///
+        /// Height is measured from the ground, not from the bottom of the
+        /// placeholder's box. Placeholders sink a foundation several metres
+        /// into the hill so the terrain cannot poke up through the floor, and
+        /// counting that buried part as building makes the model too tall and
+        /// then buries it by the same amount.
         /// </summary>
         void Fit(GameObject instance)
         {
+            Bounds target;
+            bool measured = Placeholder(out target);
+
+            _fittedTo = target;
+
             instance.transform.localPosition = Vector3.zero;
-            instance.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
+            instance.transform.rotation = Facing() * Quaternion.Euler(0f, yaw, 0f);
             instance.transform.localScale = Vector3.one;
 
             Bounds model;
             if (!Measure(instance, out model)) return;
 
-            Bounds target;
-            bool measured = Placeholder(out target);
+            float ground = measured ? GroundUnder(target) : GroundUnder(transform.position);
 
-            float wanted = measured
-                ? Mathf.Max(target.size.x, target.size.z)
-                : fallbackWidth;
+            Vector3 room = measured
+                ? new Vector3(target.size.x, Mathf.Max(1f, target.max.y - ground), target.size.z)
+                : Vector3.one * fallbackWidth;
 
-            float widest = Mathf.Max(model.size.x, model.size.z);
-            if (widest < 0.0001f || wanted < 0.0001f) return;
+            float scale = Mathf.Min(Fitting(room.x, model.size.x),
+                          Mathf.Min(Fitting(room.y, model.size.y),
+                                    Fitting(room.z, model.size.z)));
 
-            instance.transform.localScale = Vector3.one * (wanted / widest * fitScale);
+            if (scale <= 0f || scale > 1e6f) return;
 
-            // Rotation and scale both move the box, so measure it again.
+            instance.transform.localScale = Vector3.one * (scale * fitScale);
+
+            // Scale moved the box, so measure it again before standing it up.
             if (!Measure(instance, out model)) return;
 
             Vector3 stand = measured
-                ? new Vector3(target.center.x, target.min.y, target.center.z)
-                : transform.position;
+                ? new Vector3(target.center.x, ground, target.center.z)
+                : new Vector3(transform.position.x, ground, transform.position.z);
 
-            var shift = new Vector3(stand.x - model.center.x,
-                                    stand.y - model.min.y - bed,
-                                    stand.z - model.center.z);
+            instance.transform.position += new Vector3(stand.x - model.center.x,
+                                                       stand.y - model.min.y - bed,
+                                                       stand.z - model.center.z) + offset;
 
-            instance.transform.position += shift + offset;
+            _size = model.size;
+        }
+
+        /// <summary>How much this axis may be scaled by. Zero means it does not constrain.</summary>
+        static float Fitting(float room, float has)
+        {
+            return has > 0.0001f && room > 0.0001f ? room / has : float.MaxValue;
+        }
+
+        /// <summary>
+        /// Which way the placeholder faces. The building's own geometry is
+        /// turned towards the run, and a hero model standing square to the
+        /// world instead would have its back door on the piste.
+        /// </summary>
+        Quaternion Facing()
+        {
+            for (int i = 0; i < transform.childCount; i++)
+            {
+                Transform child = transform.GetChild(i);
+                if (child.name == ContainerName) continue;
+                if (child.GetComponentInChildren<Renderer>(true) == null) continue;
+
+                return child.rotation;
+            }
+
+            return transform.rotation;
+        }
+
+        /// <summary>Snow level under a footprint, so the model stands on the hill.</summary>
+        float GroundUnder(Bounds target)
+        {
+            float ground = GroundUnder(target.center);
+
+            // Never above the roof and never below the floor, whatever the
+            // terrain says: a bad sample must not launch the building.
+            return Mathf.Clamp(ground, target.min.y, target.max.y);
+        }
+
+        float GroundUnder(Vector3 at)
+        {
+            var mountain = SnowBound.Mountain.MountainGenerator.Instance;
+            return mountain != null && mountain.Ready ? mountain.SampleHeight(at.x, at.z) : at.y;
         }
 
         /// <summary>The bounds of the geometry this model is standing in for.</summary>
@@ -207,10 +292,15 @@ namespace SnowBound.Buildings
         /// detail worth two thousand pixels and combining at full size costs a
         /// visible pause on load.
         /// </summary>
-        void Dress(GameObject instance)
+        bool Dress(GameObject instance)
         {
             var albedo = Load(albedoPath);
-            if (albedo == null) return;
+
+            if (albedo == null)
+            {
+                Problem = "No texture at Resources/" + albedoPath;
+                return false;
+            }
 
             var maps = new SurfaceMaps
             {
@@ -222,7 +312,7 @@ namespace SnowBound.Buildings
             // One tile across the whole model: it is properly unwrapped, unlike
             // everything this project generates for itself.
             Material material = MaterialFactory.CreateSurface(name + "Model", maps, Color.white, 1f, 1f);
-            if (material == null) return;
+            if (material == null) return false;
 
             // The model is properly unwrapped, so one tile across the whole of
             // it rather than the metre-based tiling everything generated uses.
@@ -241,6 +331,8 @@ namespace SnowBound.Buildings
                 r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
                 r.receiveShadows = true;
             }
+
+            return true;
         }
 
         Texture2D Load(string path)

@@ -88,6 +88,7 @@ namespace SnowBound.Lifts
         public bool PlayerInLoadingArea { get; private set; }
 
         ChairliftPath _path;
+        readonly GroundWatch _ground = new GroundWatch();
         readonly List<ChairliftChair> _chairs = new List<ChairliftChair>();
         readonly List<ILiftPassenger> _queue = new List<ILiftPassenger>();
         float _travel;
@@ -250,6 +251,25 @@ namespace SnowBound.Lifts
 
             foreach (Transform tr in root.GetComponentsInChildren<Transform>(true))
                 tr.gameObject.hideFlags = HideFlags.DontSaveInEditor;
+
+            // Towers and terminal posts were just stood on the ground as it is
+            // now. Anything that moves it afterwards — the lodge flattening
+            // its pad, a run carved under the line, the player sculpting —
+            // leaves them hanging, so watch for it and stand up again.
+            _ground.Follow(mountain, Build);
+            _ground.Note(Footprint(line), 6);
+        }
+
+        /// <summary>The strip of mountain the line stands on, with room for the terminals.</summary>
+        static Rect Footprint(List<Vector3> line)
+        {
+            var bounds = new Bounds(line[0], Vector3.zero);
+            for (int i = 1; i < line.Count; i++) bounds.Encapsulate(line[i]);
+
+            const float margin = 12f;
+
+            return Rect.MinMaxRect(bounds.min.x - margin, bounds.min.z - margin,
+                                   bounds.max.x + margin, bounds.max.z + margin);
         }
 
         /// <summary>Straight-line distance between the two stations, on the flat.</summary>
@@ -518,10 +538,15 @@ namespace SnowBound.Lifts
 
         // ---------------- running ----------------------------------------
 
+        void OnDisable() { _ground.Stop(); }
+
         void Update()
         {
             // Chairs are placed once at build time; only a running game moves them.
             if (!Application.isPlaying) return;
+
+            _ground.Tick();
+
             if (_path == null || _chairs.Count == 0) return;
 
             _travel += lineSpeed * Time.deltaTime;

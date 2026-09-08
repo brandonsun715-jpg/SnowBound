@@ -40,7 +40,10 @@ namespace SnowBound.Game
 
         bool _armed;
 
+        readonly SnowBound.Mountain.GroundWatch _ground = new SnowBound.Mountain.GroundWatch();
+
         void Start() { Build(); }
+        void OnDisable() { _ground.Stop(); }
 
         static void Kill(Object o)
         {
@@ -93,6 +96,14 @@ namespace SnowBound.Game
 
             foreach (Transform tr in root.GetComponentsInChildren<Transform>(true))
                 tr.gameObject.hideFlags = HideFlags.DontSaveInEditor;
+
+            // The gate posts are cut to the ground under each one. Regroom or
+            // re-carve the run and they need cutting again.
+            _ground.Follow(mountain, Build);
+            _ground.Note(Rect.MinMaxRect(Mathf.Min(top.x, bottom.x) - run.halfWidth - 4f,
+                                         Mathf.Min(top.z, bottom.z) - 4f,
+                                         Mathf.Max(top.x, bottom.x) + run.halfWidth + 4f,
+                                         Mathf.Max(top.z, bottom.z) + 4f), 6);
         }
 
         void Gate(Transform parent, Vector3 at, float halfWidth, Material postMat, Material bannerMat)
@@ -129,6 +140,8 @@ namespace SnowBound.Game
         void Update()
         {
             if (!Application.isPlaying) return;
+
+            _ground.Tick();
 
             if (player == null) player = FindAnyObjectByType<PlayerController>();
             if (player == null || !HasCourse) return;
