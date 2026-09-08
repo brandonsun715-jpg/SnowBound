@@ -325,72 +325,213 @@ namespace SnowBound.Lifts
 
         // ---------------- structure --------------------------------------
 
+        /// <summary>
+        /// A tower under every node of the line, cut to the snow under it so
+        /// the cable keeps an even height over whatever it crosses.
+        ///
+        /// Built at real size rather than as a scaled primitive: a stretched
+        /// unit cylinder puts one tile of texture over the whole mast however
+        /// tall it is, which is why the old towers read as smooth grey plastic
+        /// whatever material they were wearing.
+        /// </summary>
         void BuildTowers(Transform root, List<Vector3> line, Material steel)
         {
             for (int i = 0; i < line.Count; i++)
             {
+                // The terminals have their own structure; this is the line.
+                if (i == 0 || i == line.Count - 1) continue;
+
                 Vector3 top = line[i];
                 float ground = mountain.SampleHeight(top.x, top.z);
                 float height = Mathf.Max(1f, top.y - ground);
 
-                var mast = Piece(root, PrimitiveType.Cylinder, "LiftTower",
-                                 new Vector3(top.x, ground + height * 0.5f, top.z),
-                                 new Vector3(0.55f, height * 0.5f, 0.55f), steel, true);
-                mast.transform.rotation = Quaternion.identity;
-
                 Quaternion facing = Facing(line, i);
 
-                var arm = Piece(root, PrimitiveType.Cube, "LiftCrossarm",
-                                new Vector3(top.x, top.y + 0.25f, top.z),
-                                new Vector3(trackSpacing + 1.6f, 0.28f, 0.36f), steel, false);
-                arm.transform.rotation = facing;
+                Slab(root, "TowerFooting", new Vector3(top.x, ground + 0.15f, top.z),
+                     facing, new Vector3(1.5f, 0.3f, 1.5f), steel, false);
 
-                // Sheave trains, the little wheel packs the cable rides over.
+                Slab(root, "TowerMast", new Vector3(top.x, ground + height * 0.5f, top.z),
+                     facing, new Vector3(0.44f, height, 0.44f), steel, true);
+
+                Slab(root, "TowerCrossarm", new Vector3(top.x, top.y + 0.28f, top.z),
+                     facing, new Vector3(trackSpacing + 1.8f, 0.3f, 0.42f), steel, false);
+
+                // Sheave trains: the wheel packs the cable rides over, hung
+                // under each end of the crossarm.
                 for (int side = -1; side <= 1; side += 2)
                 {
                     Vector3 offset = facing * new Vector3(side * trackSpacing * 0.5f, 0f, 0f);
-                    var sheave = Piece(root, PrimitiveType.Cube, "LiftSheave",
-                                       top + offset + Vector3.up * 0.02f,
-                                       new Vector3(0.9f, 0.34f, 0.3f), steel, false);
-                    sheave.transform.rotation = facing;
+                    Vector3 at = top + offset;
+
+                    Slab(root, "SheaveHanger", new Vector3(at.x, top.y + 0.08f, at.z),
+                         facing, new Vector3(0.16f, 0.34f, 0.24f), steel, false);
+
+                    Slab(root, "SheaveTrain", new Vector3(at.x, top.y - 0.14f, at.z),
+                         facing, new Vector3(1.15f, 0.26f, 0.34f), steel, false);
                 }
             }
         }
 
+        /// <summary>A real-size box, placed and turned in the world.</summary>
+        GameObject Slab(Transform parent, string name, Vector3 position, Quaternion rotation,
+                        Vector3 size, Material material, bool collider)
+        {
+            GameObject go = Boxes.Create(parent, name, Vector3.zero, size, material, collider);
+            go.transform.SetPositionAndRotation(position, rotation);
+
+            return go;
+        }
+
+        /// <summary>
+        /// A station at each end.
+        ///
+        /// This used to be a flat slab on four legs, which is what a lift
+        /// terminal looks like if you only model the canopy. A real one is a
+        /// building: the drive machinery is housed above the bullwheel, the
+        /// roof over it is pitched so snow comes off, and the loading lane
+        /// underneath is fenced so a queue has a shape.
+        ///
+        /// Everything inside is built in the station's own frame — local X
+        /// across the line, local Z along it — because that is the only way
+        /// these numbers are readable as the metres they are.
+        /// </summary>
         void BuildTerminals(Transform root, List<Vector3> line, Material steel, Material shell)
         {
             for (int end = 0; end < 2; end++)
             {
                 int i = end == 0 ? 0 : line.Count - 1;
+
                 Vector3 node = line[i];
-                Quaternion facing = Facing(line, i);
                 float ground = mountain.SampleHeight(node.x, node.z);
 
-                // The bullwheel the cable turns around: a big flat disc.
-                Piece(root, PrimitiveType.Cylinder, "LiftBullwheel",
-                      new Vector3(node.x, node.y, node.z),
-                      new Vector3(trackSpacing, 0.14f, trackSpacing), steel, false);
+                var station = new GameObject(end == 0 ? "BottomStation" : "TopStation");
+                station.transform.SetParent(root, false);
+                station.transform.SetPositionAndRotation(new Vector3(node.x, ground, node.z),
+                                                         Facing(line, i));
 
-                // Canopy, held clear of the loading lane so you can walk under.
-                float canopyHeight = node.y + 2.4f;
-                Piece(root, PrimitiveType.Cube, "LiftCanopy",
-                      new Vector3(node.x, canopyHeight, node.z),
-                      new Vector3(trackSpacing + 5f, 0.3f, 9f), shell, false)
-                    .transform.rotation = facing;
+                // Cable height above the snow here. Everything else is hung
+                // off it, so a terminal on a steep pitch stays proportioned.
+                float cable = Mathf.Max(2.4f, node.y - ground);
 
-                for (int sx = -1; sx <= 1; sx += 2)
+                // The lane goes where the chairs actually pick people up and
+                // set them down: boardLead metres above the bottom station,
+                // unloadLead metres below the top one. Uphill is local +Z at
+                // both ends, so those are opposite sides of the two stations.
+                float approach = end == 0 ? 1f : -1f;
+
+                BuildStation(station.transform, cable, approach, ground, steel, shell);
+            }
+        }
+
+        void BuildStation(Transform station, float cable, float approach, float ground,
+                          Material steel, Material shell)
+        {
+            float half = trackSpacing * 0.5f;
+            float roofBase = cable + 2.5f;
+            float roofHalf = half + 2.6f;
+            const float roofLength = 11f;
+
+            // The bullwheel the cable turns around, and the drive housing over
+            // it. The wheel stays visible under the housing: it is the one
+            // moving part of a lift anybody can see from the ground.
+            Piece(station, PrimitiveType.Cylinder, "Bullwheel",
+                  new Vector3(0f, cable, 0f),
+                  new Vector3(trackSpacing, 0.16f, trackSpacing), steel, false, true);
+
+            Boxes.Create(station, "DriveHousing", new Vector3(0f, cable + 1.35f, 0f),
+                         new Vector3(trackSpacing + 1.1f, 1.7f, 3.4f), shell);
+
+            Boxes.Create(station, "HousingSill", new Vector3(0f, cable + 0.42f, 0f),
+                         new Vector3(trackSpacing + 1.4f, 0.22f, 3.7f), steel);
+
+            // Four columns, each cut to the snow under its own foot. On a
+            // pitch that is a difference of a metre or more between them.
+            for (int sx = -1; sx <= 1; sx += 2)
+            {
+                for (int sz = -1; sz <= 1; sz += 2)
                 {
-                    for (int sz = -1; sz <= 1; sz += 2)
-                    {
-                        Vector3 offset = facing * new Vector3(sx * (trackSpacing * 0.5f + 2.2f), 0f, sz * 4f);
-                        Vector3 postBase = new Vector3(node.x + offset.x, 0f, node.z + offset.z);
-                        float postGround = mountain.SampleHeight(postBase.x, postBase.z);
-                        float postHeight = Mathf.Max(1f, canopyHeight - postGround);
+                    var foot = new Vector3(sx * (half + 2.2f), 0f, sz * 4.4f);
+                    Vector3 world = station.TransformPoint(foot);
 
-                        Piece(root, PrimitiveType.Cylinder, "LiftPost",
-                              new Vector3(postBase.x, postGround + postHeight * 0.5f, postBase.z),
-                              new Vector3(0.28f, postHeight * 0.5f, 0.28f), steel, true);
-                    }
+                    float under = mountain.SampleHeight(world.x, world.z) - ground;
+                    float height = Mathf.Max(1.5f, roofBase - under);
+
+                    Boxes.Create(station, "Column",
+                                 new Vector3(foot.x, under + height * 0.5f, foot.z),
+                                 new Vector3(0.34f, height, 0.34f), steel, true);
+                }
+            }
+
+            // Beams tying the four columns together. Without them the housing
+            // and the roof both hang in the middle of thin air with nothing
+            // between them and the legs.
+            float beamY = roofBase - 0.25f;
+            float acrossSpan = (half + 2.2f) * 2f + 0.34f;
+            const float alongSpan = 4.4f * 2f + 0.34f;
+
+            for (int side = -1; side <= 1; side += 2)
+            {
+                Boxes.Create(station, "StationBeam", new Vector3(0f, beamY, side * 4.4f),
+                             new Vector3(acrossSpan, 0.3f, 0.28f), steel);
+
+                Boxes.Create(station, "StationBeam", new Vector3(side * (half + 2.2f), beamY, 0f),
+                             new Vector3(0.28f, 0.3f, alongSpan), steel);
+            }
+
+            // Pulled towards the lane, so the loading point is under cover.
+            BuildStationRoof(station, roofBase, roofHalf, roofLength, approach * 1.5f, shell, steel);
+            BuildLoadingLane(station, approach, half, steel);
+        }
+
+        /// <summary>A pitched roof, ridged along the line, on a fascia beam each side.</summary>
+        void BuildStationRoof(Transform station, float roofBase, float roofHalf, float length,
+                              float along, Material shell, Material steel)
+        {
+            var verts = new List<Vector3>();
+            var tris = new List<int>();
+
+            PrimitiveMeshes.AddPrism(verts, tris, Vector3.zero, roofHalf, 1.6f, length);
+
+            var go = new GameObject("StationRoof");
+            go.transform.SetParent(station, false);
+            go.transform.localPosition = new Vector3(0f, roofBase, along);
+
+            go.AddComponent<MeshFilter>().sharedMesh =
+                PrimitiveMeshes.BuildMesh("StationRoof", verts, tris);
+
+            go.AddComponent<MeshRenderer>().sharedMaterial = shell;
+
+            // Fascia along both eaves. Without it the roof reads as a sheet of
+            // card, because a plane with no thickness always does.
+            for (int side = -1; side <= 1; side += 2)
+            {
+                Boxes.Create(station, "Fascia",
+                             new Vector3(side * (roofHalf - 0.08f), roofBase + 0.16f, along),
+                             new Vector3(0.16f, 0.42f, length), steel);
+            }
+        }
+
+        /// <summary>
+        /// The fenced lane you stand in to be picked up. It is what turns the
+        /// space under the roof into somewhere a queue obviously goes.
+        /// </summary>
+        void BuildLoadingLane(Transform station, float approach, float half, Material steel)
+        {
+            const float length = 7.5f;
+            float centre = approach * (length * 0.5f + 1.6f);
+
+            for (int side = -1; side <= 1; side += 2)
+            {
+                float x = side * (half + 0.95f);
+
+                Boxes.Create(station, "LaneRail", new Vector3(x, 1.02f, centre),
+                             new Vector3(0.08f, 0.08f, length), steel);
+
+                for (int p = -1; p <= 1; p += 2)
+                {
+                    Boxes.Create(station, "LanePost",
+                                 new Vector3(x, 0.51f, centre + p * (length * 0.5f - 0.2f)),
+                                 new Vector3(0.09f, 1.02f, 0.09f), steel);
                 }
             }
         }
