@@ -99,15 +99,32 @@ namespace SnowBound.Resort
 
         HeroAssets.Piece Piece(string part) { return HeroAssets.Geometry(HeroAssets.Props, part); }
 
-        /// <summary>Stand one prop on the snow, turned to face a direction.</summary>
+        /// <summary>
+        /// Stand one prop on the snow, turned to face a direction.
+        ///
+        /// `bed` is how much of the ground's own tilt the prop takes. A bench
+        /// or a fence panel lies with the hill — level on a slope it has one
+        /// end in the air and the other buried — while a lamp post and a sign
+        /// are dug in upright whatever the ground under them is doing, so they
+        /// pass nought.
+        /// </summary>
         void Place(MeshBatcher batch, HeroAssets.Piece piece, Vector3 at, float yaw,
-                   float scale = 1f)
+                   float scale = 1f, float bed = 0f)
         {
             if (piece == null) return;
 
+            Quaternion lie = Quaternion.Euler(0f, yaw, 0f);
+
+            if (bed > 0f)
+            {
+                Quaternion slope = Quaternion.FromToRotation(
+                    Vector3.up, mountain.SampleNormal(at.x, at.z));
+                lie = Quaternion.Slerp(Quaternion.identity, slope, Mathf.Clamp01(bed)) * lie;
+            }
+
             var placement = Matrix4x4.TRS(
                 new Vector3(at.x, mountain.SampleHeight(at.x, at.z) - 0.04f, at.z),
-                Quaternion.Euler(0f, yaw, 0f), Vector3.one * scale);
+                lie, Vector3.one * scale);
 
             batch.Add(piece.vertices, piece.triangles, 0, placement, piece.uvs);
         }
@@ -136,8 +153,8 @@ namespace SnowBound.Resort
 
             foreach (Vector3 seat in seats)
             {
-                Place(batch, bench, door + turn * seat, yaw + (seat.z > 6f ? 0f : 180f));
-                Place(batch, bin, door + turn * (seat + new Vector3(1.4f, 0f, 0.2f)), yaw);
+                Place(batch, bench, door + turn * seat, yaw + (seat.z > 6f ? 0f : 180f), 1f, 0.7f);
+                Place(batch, bin, door + turn * (seat + new Vector3(1.4f, 0f, 0.2f)), yaw, 1f, 0.7f);
             }
 
             var lamps = new[] { new Vector3(-8f, 0f, 2f), new Vector3(8f, 0f, 2f),
@@ -152,7 +169,7 @@ namespace SnowBound.Resort
                                 new Vector3(-11f, 0f, 17f) };
 
             for (int i = 0; i < heaps.Length; i++)
-                Place(batch, pile, door + turn * heaps[i], yaw + i * 47f, 0.8f + i * 0.25f);
+                Place(batch, pile, door + turn * heaps[i], yaw + i * 47f, 0.8f + i * 0.25f, 0.9f);
         }
 
         /// <summary>A board at the top of every run, facing the way down it.</summary>
@@ -220,7 +237,7 @@ namespace SnowBound.Resort
 
                         if (lip - out_ < fenceDrop) continue;
 
-                        Place(batch, panel, edge, yaw);
+                        Place(batch, panel, edge, yaw, 1f, 1f);
                         placed++;
                     }
                 }

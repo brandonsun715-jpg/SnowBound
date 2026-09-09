@@ -48,6 +48,14 @@ namespace SnowBound.Mountain
         public float minRockSize = 1.5f;
         public float maxRockSize = 5f;
 
+        [Header("Cliffs")]
+        [Tooltip("Bands of bedded rock on the steep ground. A band is several\nslabs laid along the contour, not one boulder made big.")]
+        public int cliffBands = 34;
+        [Tooltip("How steep the ground has to be before the rock breaks through.")]
+        public float minCliffSlopeDeg = 32f;
+        [Tooltip("Width of a slab in the band, in metres.")]
+        public float cliffSize = 7f;
+
         [Header("Piste edge markers")]
         public float markerSpacing = 25f;
 
@@ -498,8 +506,153 @@ namespace SnowBound.Mountain
                 collider.convex = true;
             }
 
+            SpawnCliffs(rocks, settled, colliders.transform, unit, modelled);
+
             rocks.Flush();
             settled.Flush();
+        }
+
+        // ---------------- cliffs -----------------------------------------
+
+        /// <summary>
+        /// Bands of bedded rock on the steep ground.
+        ///
+        /// A cliff is not a big boulder. What reads as a cliff is a line of
+        /// flat-topped slabs following one contour — the bed that broke —
+        /// with the odd tooth left standing above it, all of it half buried
+        /// so the rock comes out of the mountain instead of sitting on it.
+        ///
+        /// It shares the boulders' batches, so a whole map of cliffs is not
+        /// one extra draw call.
+        /// </summary>
+        void SpawnCliffs(MeshBatcher rocks, MeshBatcher settled, Transform colliders,
+                         float unit, bool modelled)
+        {
+            if (!modelled || cliffBands <= 0) return;
+
+            HeroAssets.Piece slab = HeroAssets.Geometry(HeroAssets.Rocks, "RockSlab");
+            HeroAssets.Piece spire = HeroAssets.Geometry(HeroAssets.Rocks, "RockSpire");
+            if (slab == null || spire == null) return;
+
+            Mesh slabHull = HeroAssets.Shape(HeroAssets.Rocks, "RockSlab");
+            Mesh spireHull = HeroAssets.Shape(HeroAssets.Rocks, "RockSpire");
+
+            float halfW = mountain.width * 0.5f;
+
+            for (int band = 0; band < cliffBands; band++)
+            {
+                // Find somewhere steep. Give up on a band rather than settle
+                // for flat ground: a cliff in a meadow is worse than no cliff.
+                float x = 0f, z = 0f;
+                Vector3 normal = Vector3.up;
+                bool found = false;
+
+                for (int attempt = 0; attempt < 40 && !found; attempt++)
+                {
+                    x = Rand(-halfW + 20f, halfW - 20f);
+                    z = Rand(30f, mountain.length - 30f);
+
+                    if (mountain.OnAnyTrail(x, z, cliffSize)) continue;
+
+                    normal = mountain.SampleNormal(x, z);
+                    found = Vector3.Angle(normal, Vector3.up) >= minCliffSlopeDeg;
+                }
+
+                if (!found) continue;
+
+                // Along the contour, not down the fall line. Rock breaks along
+                // the bed, and the bed is level.
+                Vector3 fall = Vector3.ProjectOnPlane(-normal, Vector3.up);
+                if (fall.sqrMagnitude < 0.0001f) continue;
+
+                Vector3 contour = Vector3.Cross(Vector3.up, fall.normalized).normalized;
+
+                int pieces = _rnd.Next(3, 7);
+                float step = cliffSize * Rand(0.62f, 0.82f);
+                float start = -(pieces - 1) * 0.5f * step;
+
+                for (int i = 0; i < pieces; i++)
+                {
+                    float along = start + i * step;
+
+                    // The band wanders off its line a little, so it is a band
+                    // and not a wall.
+                    Vector3 drift = fall.normalized * Rand(-cliffSize * 0.35f, cliffSize * 0.35f);
+                    float px = x + contour.x * along + drift.x;
+                    float pz = z + contour.z * along + drift.z;
+
+                    if (mountain.OnAnyTrail(px, pz, 3f)) continue;
+
+                    Vector3 groundNormal = mountain.SampleNormal(px, pz);
+                    if (Vector3.Angle(groundNormal, Vector3.up) < minCliffSlopeDeg * 0.7f) continue;
+
+                    float h = mountain.SampleHeight(px, pz);
+                    bool tooth = _rnd.NextDouble() < 0.22;
+
+                    HeroAssets.Piece piece = tooth ? spire : slab;
+                    Mesh hull = tooth ? spireHull : slabHull;
+
+                    float size = cliffSize * Rand(0.72f, 1.30f) * (tooth ? 0.65f : 1f);
+                    var scale = new Vector3(size * Rand(0.9f, 1.15f), size * Rand(0.85f, 1.2f),
+                                            size * Rand(0.9f, 1.15f));
+
+                    // Bedded into the slope: the slab lies with the hill, and
+                    // most of its depth is under the surface.
+                    Quaternion bed = Quaternion.Slerp(Quaternion.identity,
+                                                      Quaternion.FromToRotation(Vector3.up, groundNormal),
+                                                      Rand(0.55f, 0.95f));
+
+                    float yaw = Mathf.Atan2(-contour.z, contour.x) * Mathf.Rad2Deg + Rand(-16f, 16f);
+                    Quaternion rotation = bed * Quaternion.Euler(Rand(-8f, 8f), yaw, Rand(-8f, 8f));
+
+                    // Half buried, measured off the model rather than guessed:
+                    // a slab is sunk most of its thickness, a tooth only its
+                    // foot, because a tooth is what is left standing.
+                    float height = LocalHeight(piece) * scale.y * unit;
+                    float sink = height * (tooth ? Rand(0.16f, 0.28f) : Rand(0.30f, 0.52f));
+                    var position = new Vector3(px, h - sink, pz);
+
+                    var placement = Matrix4x4.TRS(position, rotation, scale * unit);
+                    rocks.Add(piece.vertices, piece.triangles, 0, placement, piece.uvs);
+
+                    // Snow lies on the top of a slab, level, but only on the
+                    // ones that are lying down — nothing settles on a tooth.
+                    if (!tooth && Vector3.Angle(rotation * Vector3.up, Vector3.up) < 34f)
+                    {
+                        var capped = Matrix4x4.TRS(position + Vector3.up * height * 0.26f,
+                                                   Quaternion.Euler(0f, yaw, 0f),
+                                                   new Vector3(scale.x * 0.9f, scale.y * 0.55f,
+                                                               scale.z * 0.9f) * unit);
+                        settled.Add(piece.vertices, piece.triangles, 0, capped);
+                    }
+
+                    if (hull == null) continue;
+
+                    var hit = new GameObject(tooth ? "CliffTooth" : "CliffSlab");
+                    hit.transform.SetParent(colliders, false);
+                    hit.transform.SetPositionAndRotation(position, rotation);
+                    hit.transform.localScale = scale * unit;
+
+                    var collider = hit.AddComponent<MeshCollider>();
+                    collider.sharedMesh = hull;
+                    collider.convex = true;
+                }
+            }
+        }
+
+        /// <summary>How tall one piece of geometry is in its own space.</summary>
+        static float LocalHeight(HeroAssets.Piece piece)
+        {
+            float low = float.MaxValue, high = float.MinValue;
+
+            for (int i = 0; i < piece.vertices.Count; i++)
+            {
+                float y = piece.vertices[i].y;
+                if (y < low) low = y;
+                if (y > high) high = y;
+            }
+
+            return high > low ? high - low : 1f;
         }
 
         /// <summary>

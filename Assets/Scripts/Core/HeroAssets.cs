@@ -154,6 +154,25 @@ namespace SnowBound.Core
             return piece.Valid ? piece : null;
         }
 
+        /// <summary>
+        /// The shared mesh of one named part, straight off the prefab.
+        ///
+        /// Geometry() copies the mesh because a batcher needs the numbers;
+        /// a collider only needs to point at one, and pointing every cliff
+        /// at the same mesh means the hull is cooked once.
+        /// </summary>
+        public static Mesh Shape(string folder, string part)
+        {
+            GameObject prefab = Prefab(folder);
+            if (prefab == null) return null;
+
+            Transform found = Part(prefab.transform, part);
+            if (found == null) return null;
+
+            var filter = found.GetComponent<MeshFilter>();
+            return filter != null ? filter.sharedMesh : null;
+        }
+
         static readonly Dictionary<string, Mesh> Welded = new Dictionary<string, Mesh>();
 
         /// <summary>

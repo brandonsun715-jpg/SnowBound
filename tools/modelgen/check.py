@@ -51,7 +51,7 @@ EXPECTED = {
 
 PARTS = {
     "Trees": ["TreeA", "TreeB", "TreeC", "SnowA", "SnowB", "SnowC"],
-    "Rocks": ["RockA", "RockB", "RockC"],
+    "Rocks": ["RockA", "RockB", "RockC", "RockSlab", "RockSpire"],
     "ParkFeatures": ["Kicker", "Box", "Rail", "Leg"],
     "Flora": ["ShrubA", "SnowShrubA", "ShrubB", "Fallen", "SnowFallen", "Stump"],
     "ResortProps": ["Bench", "Bin", "Lamp", "Sign", "Fence", "Pile"],

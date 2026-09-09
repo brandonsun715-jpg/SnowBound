@@ -220,6 +220,10 @@ namespace SnowBound.Player
 
             if (onSnow && !_seated)
             {
+                // Slip is measured along the rider's right, so it is positive
+                // in a left-hand turn, and a positive roll tips them right.
+                // Negating it is what puts the lean into the turn instead of
+                // out of it.
                 lean = Mathf.Clamp(-slip * leanPerSlip, -maxLean, maxLean);
                 crouch = Mathf.Clamp01(speed / Mathf.Max(1f, fastSpeed));
                 tuck = grounded ? 0f : 1f;

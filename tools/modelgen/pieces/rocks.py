@@ -27,10 +27,19 @@ NAME = "Rocks"
 SIZE = 2.0
 
 SHAPES = [
-    # tag, subdivisions, fracture planes, roughness of the break, squash
-    ("A", 2, 8, 0.30, (1.00, 0.86, 0.72)),
-    ("B", 2, 6, 0.42, (1.15, 0.62, 0.95)),
-    ("C", 2, 9, 0.26, (0.86, 0.94, 1.10)),
+    # tag, subdivisions, fracture planes, roughness of the break, squash, bedding
+    ("A", 2, 8, 0.30, (1.00, 0.86, 0.72), 0.0),
+    ("B", 2, 6, 0.42, (1.15, 0.62, 0.95), 0.0),
+    ("C", 2, 9, 0.26, (0.86, 0.94, 1.10), 0.0),
+
+    # The two that are not boulders. A slab is what a cliff band is made of
+    # — broad, flat-topped, bedded — and a spire is the tooth left standing
+    # when the rock either side of it went. Both are stood on steep ground at
+    # several times this size and buried to the waist, which is how an
+    # outcrop reads: rock coming out of the mountain rather than sitting on
+    # top of it.
+    ("Slab", 2, 7, 0.12, (1.60, 1.25, 1.00), 0.21),
+    ("Spire", 2, 8, 0.22, (0.74, 0.82, 1.95), 0.0),
 ]
 
 
@@ -41,19 +50,27 @@ def materials():
     }
 
 
-def boulder(tag, subdivisions, planes, break_up, squash, mat, rnd):
+def boulder(tag, subdivisions, planes, break_up, squash, bedding, mat, rnd):
     """
     An icosphere cut back to a set of random planes.
 
     Every vertex is pulled in to whichever plane it is outside of, which
     is what a rock that has split off a cliff actually is: a lump bounded
     by the surfaces it broke along.
+
+    `bedding`, when set, adds two level cuts that distance above and below
+    the middle. Squashing a sphere flat gives a lens; cutting it flat gives
+    a slab with a top you can stand on, which is what a bedded rock is.
     """
     bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=subdivisions, radius=SIZE * 0.5)
     ob = bpy.context.object
     ob.name = "Rock" + tag
 
     cuts = []
+    if bedding:
+        cuts.append(((0.0, 0.0, 1.0), bedding))
+        cuts.append(((0.0, 0.0, -1.0), bedding))
+
     for _ in range(planes):
         direction = (rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-1, 1))
         length = math.sqrt(sum(c * c for c in direction)) or 1.0
@@ -90,9 +107,9 @@ def build(mats=None):
     rnd = random.Random(4242)
     parts = []
 
-    for i, (tag, subdivisions, planes, break_up, squash) in enumerate(SHAPES):
-        mat = mats['granite'] if i != 1 else mats['darker']
-        rock = boulder(tag, subdivisions, planes, break_up, squash, mat, rnd)
+    for i, (tag, subdivisions, planes, break_up, squash, bedding) in enumerate(SHAPES):
+        mat = mats['darker'] if i in (1, 4) else mats['granite']
+        rock = boulder(tag, subdivisions, planes, break_up, squash, bedding, mat, rnd)
 
         # Sat on the ground and spread out, for the unwrap and the picture.
         low = min(v.co.z for v in rock.data.vertices)
