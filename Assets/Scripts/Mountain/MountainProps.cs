@@ -153,19 +153,34 @@ namespace SnowBound.Mountain
 
         void SpawnTrees(Transform parent)
         {
-            Piece trunk, needles, snow;
-            BuildPine(out trunk, out needles, out snow);
+            // Three modelled species if they are in the project, and the
+            // stacked cones this started as if they are not.
+            var wood = new HeroAssets.Piece[3];
+            var caps = new HeroAssets.Piece[3];
+            bool modelled = true;
 
-            Material bark = Surfaces.Bark;
-            Material snowMat = Surfaces.Settled;
+            for (int i = 0; i < 3; i++)
+            {
+                string tag = i == 0 ? "A" : i == 1 ? "B" : "C";
+                wood[i] = HeroAssets.Geometry(HeroAssets.Trees, "Tree" + tag);
+                caps[i] = HeroAssets.Geometry(HeroAssets.Trees, "Snow" + tag);
+                modelled &= wood[i] != null;
+            }
 
-            // Three species rather than three shades of one. Spruce is dark and
-            // blue, fir is warmer, pine is greyer, and a forest of all three
-            // reads as a forest instead of as one tree stamped nine hundred times.
-            var needleShades = new[] { Surfaces.Spruce, Surfaces.Fir, Surfaces.Pine };
+            Material forest = modelled ? HeroAssets.Surface(HeroAssets.Trees) : null;
+            modelled &= forest != null;
 
-            var batch = new MeshBatcher(parent, "Forest",
-                new[] { bark, needleShades[0], needleShades[1], needleShades[2], snowMat });
+            Piece trunk = null, needles = null, snow = null;
+            if (!modelled) BuildPine(out trunk, out needles, out snow);
+
+            // A modelled tree carries its own bark, needles and snow in one
+            // baked texture, so the whole forest is one material. The
+            // fallback needs five: bark, three shades of needle and snow.
+            MeshBatcher batch = modelled
+                ? new MeshBatcher(parent, "Forest", new[] { forest }, 60000, true)
+                : new MeshBatcher(parent, "Forest",
+                    new[] { Surfaces.Bark, Surfaces.Spruce, Surfaces.Fir, Surfaces.Pine,
+                            Surfaces.Settled });
 
             var colliders = new GameObject("TreeColliders");
             colliders.transform.SetParent(parent, false);
@@ -175,6 +190,10 @@ namespace SnowBound.Mountain
             // The line the forest stops at, and the band it thins out over.
             float treeLine = Mathf.Max(20f, mountain.Summit * treeLineShare);
             float fadeFrom = treeLine - Mathf.Max(1f, treeLineFade);
+
+            // A modelled tree is drawn ten metres tall; the old one was drawn
+            // one, and both are scaled to the height this tree wants.
+            float unit = modelled ? 1f / HeroAssets.TreeHeight : 1f;
 
             int placed = 0;
             int guard = 0;
@@ -204,11 +223,25 @@ namespace SnowBound.Mountain
                 var placement = Matrix4x4.TRS(
                     new Vector3(x, h - 0.3f, z),
                     Quaternion.Euler(0f, Rand(0f, 360f), 0f),
-                    new Vector3(height * girth, height, height * girth));
+                    new Vector3(height * girth * unit, height * unit, height * girth * unit));
 
-                batch.Add(trunk.verts, trunk.tris, 0, placement);
-                batch.Add(needles.verts, needles.tris, 1 + _rnd.Next(needleShades.Length), placement);
-                batch.Add(snow.verts, snow.tris, 4, placement);
+                if (modelled)
+                {
+                    int species = _rnd.Next(wood.Length);
+
+                    batch.Add(wood[species].vertices, wood[species].triangles, 0, placement,
+                              wood[species].uvs);
+
+                    if (caps[species] != null)
+                        batch.Add(caps[species].vertices, caps[species].triangles, 0, placement,
+                                  caps[species].uvs);
+                }
+                else
+                {
+                    batch.Add(trunk.verts, trunk.tris, 0, placement);
+                    batch.Add(needles.verts, needles.tris, 1 + _rnd.Next(3), placement);
+                    batch.Add(snow.verts, snow.tris, 4, placement);
+                }
 
                 var hit = new GameObject("TreeCollider");
                 hit.transform.SetParent(colliders.transform, false);
@@ -230,22 +263,45 @@ namespace SnowBound.Mountain
 
         void SpawnRocks(Transform parent)
         {
+            // Three modelled boulders if they are there, and Unity's sphere
+            // if they are not.
+            var stone = new HeroAssets.Piece[3];
+            bool modelled = true;
+
+            for (int i = 0; i < 3; i++)
+            {
+                stone[i] = HeroAssets.Geometry(HeroAssets.Rocks,
+                                               "Rock" + (i == 0 ? "A" : i == 1 ? "B" : "C"));
+                modelled &= stone[i] != null;
+            }
+
+            Material granite = modelled ? HeroAssets.Surface(HeroAssets.Rocks) : null;
+            modelled &= granite != null;
+
             Mesh sphere = BorrowPrimitiveMesh(PrimitiveType.Sphere);
-            if (sphere == null) return;
+            if (sphere == null && !modelled) return;
 
             var boulder = new Piece();
-            boulder.verts.AddRange(sphere.vertices);
-            boulder.tris.AddRange(sphere.triangles);
+            if (sphere != null)
+            {
+                boulder.verts.AddRange(sphere.vertices);
+                boulder.tris.AddRange(sphere.triangles);
+            }
 
-            Material rockMat = Surfaces.Rock;
-            Material capMat = Surfaces.Settled;
+            // Two batches, not two sub-meshes: the rock brought its own
+            // texture coordinates and the snow on top of it has none, and
+            // one mesh cannot be unwrapped and projected at the same time.
+            var rocks = modelled
+                ? new MeshBatcher(parent, "Rocks", new[] { granite }, 60000, true)
+                : new MeshBatcher(parent, "Rocks", new[] { Surfaces.Rock });
 
-            var batch = new MeshBatcher(parent, "Rocks", new[] { rockMat, capMat });
+            var settled = new MeshBatcher(parent, "RockSnow", new[] { Surfaces.Settled });
 
             var colliders = new GameObject("RockColliders");
             colliders.transform.SetParent(parent, false);
 
             float halfW = mountain.width * 0.5f;
+            float unit = modelled ? 1f / HeroAssets.RockSize : 1f;
 
             for (int i = 0; i < rockCount; i++)
             {
@@ -262,14 +318,26 @@ namespace SnowBound.Mountain
 
                 Vector3 position = new Vector3(x, mountain.SampleHeight(x, z) - sy * 0.28f, z);
                 Quaternion tilt = Quaternion.Euler(Rand(-25f, 25f), Rand(0f, 360f), Rand(-25f, 25f));
-                var placement = Matrix4x4.TRS(position, tilt, new Vector3(sx, sy, sz));
+                var placement = Matrix4x4.TRS(position, tilt,
+                                              new Vector3(sx * unit, sy * unit, sz * unit));
 
-                batch.Add(boulder.verts, boulder.tris, 0, placement);
+                if (modelled)
+                {
+                    HeroAssets.Piece rock = stone[_rnd.Next(stone.Length)];
+                    rocks.Add(rock.vertices, rock.triangles, 0, placement, rock.uvs);
+                }
+                else
+                {
+                    rocks.Add(boulder.verts, boulder.tris, 0, placement);
+                }
 
                 // Snow settles on top, level, however the boulder is tipped.
-                var cap = Matrix4x4.TRS(position + Vector3.up * sy * 0.22f, Quaternion.identity,
-                                        new Vector3(sx * 0.88f, sy * 0.55f, sz * 0.88f));
-                batch.Add(boulder.verts, boulder.tris, 1, cap);
+                if (boulder.verts.Count > 0)
+                {
+                    var cap = Matrix4x4.TRS(position + Vector3.up * sy * 0.22f, Quaternion.identity,
+                                            new Vector3(sx * 0.88f, sy * 0.55f, sz * 0.88f));
+                    settled.Add(boulder.verts, boulder.tris, 0, cap);
+                }
 
                 var hit = new GameObject("RockCollider");
                 hit.transform.SetParent(colliders.transform, false);
@@ -281,7 +349,8 @@ namespace SnowBound.Mountain
                 collider.convex = true;
             }
 
-            batch.Flush();
+            rocks.Flush();
+            settled.Flush();
         }
 
         /// <summary>

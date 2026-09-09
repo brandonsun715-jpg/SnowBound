@@ -141,7 +141,10 @@ are on screen for the whole run. Both were boxes.
    specified by, with bindings on them. *(done)*
 5. **The player** — a skier and a snowboarder, baggy park kit, hood, big
    lens, mittens; fifteen parts each so they still bend. *(done)*
-6. **A model generator** — every one of them is a script in this repo
+6. **The mountain itself** — three conifers and three boulders, batched in
+   their thousands; a shaped kicker on a levelled pad, a jib box and a
+   rail. *(done)*
+7. **A model generator** — every one of them is a script in this repo
    rather than a binary nobody can edit. *(done)*
 
 ## Making a model
@@ -451,6 +454,29 @@ was created with; picking the wrong one leaves every button silently dead.
   the game still runs, on boxes, and still sits down properly.
 - Poles hang off the hands that hold them rather than floating beside the
   rider, and the skis and the board follow the feet onto the chairlift.
+- Eighteen hundred trees cannot be eighteen hundred objects, so the forest
+  is not spawned — the models' meshes are read, placed and welded into a
+  handful of batched ones, exactly as the procedural trees were. Three
+  species and three boulders share one texture each, so the whole forest is
+  still one material and one draw call per chunk.
+- A batch either carries its pieces' own texture coordinates or projects
+  them from world space, and it cannot do both: a model arrives unwrapped
+  with its textures baked to that unwrap, and projecting over it throws
+  them away. That is why the snow on the boulders is a second batch rather
+  than a second sub-mesh.
+- The jump is a model standing on a levelled pad, the way a park crew
+  grooms one before they build. Its collider is its own mesh, so what you
+  ride is exactly what you see, and it is pitched to the slope so the
+  approach meets the snow instead of stepping up onto it. The old
+  terrain-following ramp is still there and still builds if the model is
+  missing.
+- The takeoff is a circular arc tangent to the snow, ending at a 42 degree
+  lip. A jump is a shape with a name, and the power curve with a vertical
+  face this started as was not it.
+- The park has a rail now as well as its two boxes. The slab is still the
+  collider and still the thing the game reasons about — where it is, how it
+  is tilted, that it is slick rather than snow — and the tube is hung on it
+  and only ever seen.
 - An FBX carries its own idea of what a unit means, and getting it wrong
   does not look like an error: the model imports a hundred times too small
   and simply is not there. Blender writes that field and reads it back the

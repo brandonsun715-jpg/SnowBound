@@ -167,6 +167,19 @@ def place(ob, at=(0, 0, 0), rot=(0, 0, 0), scale=(1, 1, 1)):
     return apply_transform(ob)
 
 
+def lay(ob, at):
+    """
+    Move a part for the layout without baking it into its mesh.
+
+    Parts are spread out in the file so the unwrap has room and so they do
+    not cast ambient occlusion on each other. The game reads their meshes,
+    which have to stay where they were modelled, so this moves the object
+    and leaves the mesh alone.
+    """
+    ob.location = at
+    return ob
+
+
 def clone(ob, at=(0, 0, 0), rot=(0, 0, 0), scale=(1, 1, 1)):
     dup = ob.copy()
     dup.data = ob.data.copy()

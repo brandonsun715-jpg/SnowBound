@@ -52,6 +52,11 @@ namespace SnowBound.Mountain
         [Tooltip("Extra drop across the length of the down box.")]
         public float downBoxDrop = 1.1f;
 
+        [Header("Rail")]
+        public float railZ = 273f;
+        [Tooltip("How far the bottom end of the rail sits below the top one.")]
+        public float railDrop = 1.4f;
+
         readonly GroundWatch _ground = new GroundWatch();
 
         void Start() { Build(); }
@@ -187,6 +192,63 @@ namespace SnowBound.Mountain
         void BuildKicker(Transform root, float startZ, float height, string name,
                          Material rideOn, Material shaded)
         {
+            float length = height * lengthPerHeight;
+            float midZ = startZ - length * 0.5f;
+            float centreX = CentreX(midZ);
+
+            // A park crew grooms a pad before they build on it, and so does
+            // this: level the ground, then protect it, so nothing sculpts
+            // the jump out from under itself later.
+            var pad = new Vector3(centreX, 0f, midZ);
+            mountain.FlattenPad(pad, length * 0.7f, length * 0.9f);
+            mountain.Protect(pad, length * 0.7f, name);
+
+            if (BuildModelledKicker(root, name, centreX, midZ, length, height)) return;
+
+            BuildShapedKicker(root, startZ, height, name, rideOn, shaded);
+        }
+
+        /// <summary>
+        /// The real jump, stood on the pad and pitched to lie along it.
+        ///
+        /// Its collider is its own mesh, so what you ride is exactly what
+        /// you see — which is the one thing a jump cannot get wrong.
+        /// </summary>
+        bool BuildModelledKicker(Transform root, string name, float centreX, float midZ,
+                                 float length, float height)
+        {
+            float scale = height / HeroAssets.KickerHeight;
+
+            GameObject model = HeroAssets.SpawnPart(
+                HeroAssets.Park, "Kicker", root, Vector3.zero, Quaternion.identity,
+                new Vector3(1f, scale, scale));
+
+            if (model == null) return false;
+
+            // Pitched to the slope it stands on, so the approach meets the
+            // snow instead of stepping up onto it.
+            float uphill = mountain.SampleHeight(centreX, midZ + length * 0.5f);
+            float downhill = mountain.SampleHeight(centreX, midZ - length * 0.5f);
+            float pitch = -Mathf.Atan2(uphill - downhill, length) * Mathf.Rad2Deg;
+
+            model.name = name;
+            model.transform.SetPositionAndRotation(
+                new Vector3(centreX, (uphill + downhill) * 0.5f, midZ),
+                Quaternion.Euler(pitch, 0f, 0f));
+
+            var filter = model.GetComponent<MeshFilter>();
+            if (filter != null && filter.sharedMesh != null)
+                model.AddComponent<MeshCollider>().sharedMesh = filter.sharedMesh;
+
+            // Built out of snow, so it keeps leaving tracks.
+            model.AddComponent<SnowSurface>();
+
+            return true;
+        }
+
+        void BuildShapedKicker(Transform root, float startZ, float height, string name,
+                               Material rideOn, Material shaded)
+        {
             const int rows = 14;
             const float skirt = 1.4f;
 
@@ -248,12 +310,26 @@ namespace SnowBound.Mountain
 
         void BuildBoxes(Transform root, Material steel, Material slick)
         {
-            BuildBox(root, "Flat Box", boxZ, 4.5f, 0f, steel, slick);
-            BuildBox(root, "Down Box", boxZ - 16f, -4.5f, downBoxDrop, steel, slick);
+            BuildJib(root, "Flat Box", "Box", boxZ, 4.5f, 0f, boxWidth, 0.22f, steel, slick);
+            BuildJib(root, "Down Box", "Box", boxZ - 16f, -4.5f, downBoxDrop, boxWidth, 0.22f,
+                     steel, slick);
+
+            // A rail is not a box: it is a tube you have to balance on, and
+            // a park without one is a park with nothing to learn on.
+            BuildJib(root, "Down Rail", "Rail", railZ, 0.6f, railDrop, 0.16f, 0.14f,
+                     steel, slick);
         }
 
-        void BuildBox(Transform root, string name, float z, float sideways, float drop,
-                      Material steel, Material slick)
+        /// <summary>
+        /// One jib feature: a box or a rail.
+        ///
+        /// The slab is the collider and the thing the game reasons about —
+        /// where it is, how it is tilted, that it is slick rather than snow.
+        /// The model is hung on it and only ever seen, so a missing model
+        /// costs the look of the feature and nothing about riding it.
+        /// </summary>
+        void BuildJib(Transform root, string name, string part, float z, float sideways,
+                      float drop, float width, float thickness, Material steel, Material slick)
         {
             float half = boxLength * 0.5f;
 
@@ -270,7 +346,7 @@ namespace SnowBound.Mountain
             if (span < 0.1f) return;
 
             GameObject slab = Boxes.Create(root, name, Vector3.zero,
-                                           new Vector3(boxWidth, 0.22f, span), slick, true);
+                                           new Vector3(width, thickness, span), slick, true);
 
             slab.transform.position = (top + bottom) * 0.5f;
             slab.transform.rotation = Quaternion.LookRotation(along / span, Vector3.up);
@@ -278,15 +354,34 @@ namespace SnowBound.Mountain
             // Steel and plastic do not hold you back the way snow does.
             slab.AddComponent<SlickSurface>();
 
+            GameObject model = HeroAssets.SpawnPart(
+                HeroAssets.Park, part, slab.transform, Vector3.zero, Quaternion.identity,
+                new Vector3(1f, 1f, span / HeroAssets.BoxLength));
+
+            if (model != null) HeroAssets.Hide(slab.transform, model);
+
             // Legs, so it stands on the snow instead of floating over it.
-            Leg(root, steel, top);
-            Leg(root, steel, bottom);
+            Leg(root, steel, top, thickness);
+            Leg(root, steel, bottom, thickness);
         }
 
-        void Leg(Transform root, Material steel, Vector3 under)
+        void Leg(Transform root, Material steel, Vector3 under, float thickness)
         {
             float ground = mountain.SampleHeight(under.x, under.z);
-            float height = Mathf.Max(0.2f, under.y - ground);
+            float underside = under.y - thickness * 0.5f;
+            float height = Mathf.Max(0.2f, underside - ground);
+
+            GameObject model = HeroAssets.SpawnPart(
+                HeroAssets.Park, "Leg", root, Vector3.zero, Quaternion.identity,
+                new Vector3(1f, height, 1f));
+
+            if (model != null)
+            {
+                // The leg is drawn hanging a metre from its own origin, so
+                // it is hung from the underside and stretched to the snow.
+                model.transform.position = new Vector3(under.x, underside, under.z);
+                return;
+            }
 
             GameObject leg = Boxes.Create(root, "BoxLeg", Vector3.zero,
                                           new Vector3(boxWidth * 0.75f, height, 0.16f), steel);

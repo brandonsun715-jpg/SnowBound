@@ -72,7 +72,12 @@ namespace SnowBound.EditorTools
             importer.importAnimation = false;
             importer.importBlendShapes = false;
 
-            importer.isReadable = false;
+            // The forest and the rocks are welded into batched meshes rather
+            // than spawned one by one, and welding needs to read the mesh.
+            // Everything else stays unreadable, because a readable mesh is a
+            // second copy of it in memory.
+            string file = System.IO.Path.GetFileNameWithoutExtension(assetPath);
+            importer.isReadable = file == "Trees" || file == "Rocks";
             importer.meshCompression = ModelImporterMeshCompression.Medium;
             importer.optimizeMeshPolygons = true;
             importer.optimizeMeshVertices = true;

@@ -38,6 +38,19 @@ EXPECTED = {
     "ChairliftStation": ((11.02, 13.60, 7.93), "sunk"),
     "RiderSki": ((0.68, 0.73, 1.77), "floor"),
     "RiderBoard": ((0.75, 0.90, 1.77), "floor"),
+
+    # Sets of parts laid out side by side in one file, welded or spawned one
+    # at a time by the game. Their union has no meaning, so only what does
+    # is checked: the units, the unwrap, and that every part came through.
+    "Trees": ((0, 0, 0), "kit"),
+    "Rocks": ((0, 0, 0), "kit"),
+    "ParkFeatures": ((0, 0, 0), "kit"),
+}
+
+PARTS = {
+    "Trees": ["TreeA", "TreeB", "TreeC", "SnowA", "SnowB", "SnowC"],
+    "Rocks": ["RockA", "RockB", "RockC"],
+    "ParkFeatures": ["Kicker", "Box", "Rail", "Leg"],
 }
 
 # A rider is a rig: the game finds these by name and turns them, so a
@@ -98,6 +111,10 @@ def check(name):
     uvs = all(len(o.data.uv_layers) > 0 for o in meshes)
 
     rig = "-"
+    if name in PARTS:
+        missing = [part for part in PARTS[name] if part not in [o.name for o in meshes]]
+        rig = "parts" if not missing else "MISSING(" + ",".join(missing) + ")"
+
     if name in RIGS:
         found = {o.name: (o.parent.name if o.parent else None) for o in meshes}
         wrong = [part for part, parent in RIGS[name].items()
@@ -108,8 +125,11 @@ def check(name):
 
     want, anchor = EXPECTED[name]
     fits = all(abs(size[i] - want[i]) < TOLERANCE + want[i] * 0.1 for i in range(3))
+    stands = True
 
-    if anchor == "hook":
+    if anchor == "kit":
+        fits = stands = True
+    elif anchor == "hook":
         stands = abs(high) < 0.06
     elif anchor == "sunk":
         stands = -0.30 < low <= 0.02
@@ -117,7 +137,8 @@ def check(name):
         stands = abs(low) < 0.06
 
     metric = unit is not None and abs(unit - 100.0) < 0.5
-    ok = fits and stands and uvs and metric and not rig.startswith("RIG")
+    ok = (fits and stands and uvs and metric and
+          not rig.startswith("RIG") and not rig.startswith("MISSING"))
 
     return ("%-18s %5.2f x %5.2f x %5.2f m  %5d faces  %2d part(s)  %s  %s  %s  %s  %s" %
             (name, size[0], size[1], size[2], faces, len(meshes),

@@ -36,6 +36,10 @@ namespace SnowBound.Core
         public const float SkiLength = 1.72f;
         public const float PoleLength = 1.20f;
         public const float BoardLength = 1.55f;
+        public const float TreeHeight = 10.00f;    // trunk foot to crown
+        public const float RockSize = 2.00f;       // the widest boulder, across
+        public const float KickerHeight = 2.00f;   // snow to lip
+        public const float BoxLength = 8.00f;      // a jib box or a rail
 
         public const string Chair = "ChairliftChair";
         public const string Tower = "ChairliftTower";
@@ -45,6 +49,9 @@ namespace SnowBound.Core
         public const string Board = "Snowboard";
         public const string RiderSki = "RiderSki";
         public const string RiderBoard = "RiderBoard";
+        public const string Trees = "Trees";
+        public const string Rocks = "Rocks";
+        public const string Park = "ParkFeatures";
 
         /// <summary>
         /// The longest side each model was drawn at, in metres.
@@ -80,6 +87,124 @@ namespace SnowBound.Core
         static readonly Dictionary<string, GameObject> Models = new Dictionary<string, GameObject>();
         static readonly Dictionary<string, Material> Surfaces = new Dictionary<string, Material>();
         static readonly HashSet<string> Reported = new HashSet<string>();
+        static readonly Dictionary<string, Piece> Pieces = new Dictionary<string, Piece>();
+
+        /// <summary>
+        /// One model part's geometry, ready to be welded into a batch.
+        ///
+        /// Eighteen hundred trees cannot be eighteen hundred objects, so the
+        /// forest is not spawned — it is copied, placed and welded. That
+        /// needs the mesh itself rather than a prefab, and it needs the
+        /// model's own texture coordinates to come with it.
+        /// </summary>
+        public class Piece
+        {
+            public readonly List<Vector3> vertices = new List<Vector3>();
+            public readonly List<int> triangles = new List<int>();
+            public readonly List<Vector2> uvs = new List<Vector2>();
+
+            public bool Valid { get { return vertices.Count > 0 && triangles.Count > 0; } }
+        }
+
+        /// <summary>
+        /// The geometry of one named part of a model, or null if it is not
+        /// there. Cached, because reading a mesh copies all of it.
+        /// </summary>
+        public static Piece Geometry(string folder, string part)
+        {
+            string key = folder + "/" + part;
+
+            Piece piece;
+            if (Pieces.TryGetValue(key, out piece)) return piece;
+
+            piece = Read(folder, part);
+            Pieces[key] = piece;
+
+            return piece;
+        }
+
+        static Piece Read(string folder, string part)
+        {
+            GameObject prefab = Prefab(folder);
+            if (prefab == null) return null;
+
+            Transform found = Part(prefab.transform, part);
+            if (found == null) return null;
+
+            var filter = found.GetComponent<MeshFilter>();
+            if (filter == null || filter.sharedMesh == null) return null;
+
+            Mesh mesh = filter.sharedMesh;
+
+            if (!mesh.isReadable)
+            {
+                if (Reported.Add(folder + "/" + part))
+                    Debug.LogWarning("[HeroAssets] " + folder + "/" + part + " is not readable, so it " +
+                                     "cannot be batched. Tick Read/Write on its import settings.");
+                return null;
+            }
+
+            var piece = new Piece();
+            piece.vertices.AddRange(mesh.vertices);
+            piece.triangles.AddRange(mesh.triangles);
+            piece.uvs.AddRange(mesh.uv);
+
+            return piece.Valid ? piece : null;
+        }
+
+        /// <summary>Find one named object inside a model.</summary>
+        public static Transform Part(Transform root, string name)
+        {
+            foreach (Transform t in root.GetComponentsInChildren<Transform>(true))
+                if (t.name == name) return t;
+
+            return null;
+        }
+
+        /// <summary>
+        /// Stand up one named part of a model on its own — a rail out of the
+        /// park's file, a leg out of the same one — and throw the rest away.
+        ///
+        /// One file and one texture for a set of things that belong together
+        /// costs less than one of each, and the parts are laid out side by
+        /// side in it, so the part is brought back to the origin on its way
+        /// out.
+        /// </summary>
+        public static GameObject SpawnPart(string folder, string part, Transform parent,
+                                           Vector3 localPosition, Quaternion localRotation,
+                                           Vector3 scale)
+        {
+            GameObject whole = Spawn(folder, parent, localPosition, localRotation, scale);
+            if (whole == null) return null;
+
+            Transform kept = Part(whole.transform, part);
+
+            if (kept == null)
+            {
+                Kill(whole);
+                return null;
+            }
+
+            // The whole model carries the scale, including whatever
+            // correction it needed; the part carries its own on top.
+            Vector3 own = kept.localScale;
+
+            kept.SetParent(parent, false);
+            kept.localPosition = localPosition;
+            kept.localRotation = localRotation;
+            kept.localScale = Vector3.Scale(own, whole.transform.localScale);
+            kept.gameObject.name = Container;
+
+            Kill(whole);
+            return kept.gameObject;
+        }
+
+        static void Kill(GameObject go)
+        {
+            if (go == null) return;
+            if (Application.isPlaying) Object.Destroy(go);
+            else Object.DestroyImmediate(go);
+        }
 
         /// <summary>The imported model, or null if it is not in the project.</summary>
         public static GameObject Prefab(string folder)

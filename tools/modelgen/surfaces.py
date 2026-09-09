@@ -621,3 +621,143 @@ def lens(name, tint, roughness=0.05):
     nt.links.new(graded.outputs['Color'], bsdf.inputs['Base Color'])
 
     return mat
+
+
+def bark(name, colour=(0.115, 0.078, 0.052), scale=14.0):
+    """
+    Conifer bark: ridges running up the trunk, split into plates, with
+    lichen where the light gets in.
+
+    The ridges have to run vertically or a tree reads as a painted post,
+    and they are the only detail on a trunk anybody ever sees.
+    """
+    mat, nt, bsdf = _mat(name, roughness=0.82, base=colour)
+
+    vector = _coords(nt, 1.0)
+
+    ridges = _wave(nt, vector, scale * 2.6, distortion=9.0, detail=3.0, bands='X')
+    plates = _voronoi(nt, vector, scale * 1.1, feature='F1', randomness=0.9)
+    grain = _noise(nt, vector, scale * 20.0, detail=5.0)
+    lichen = _noise(nt, vector, scale * 0.9, detail=6.0, roughness=0.65)
+
+    shaded = _ramp(nt, ridges.outputs['Fac'],
+                   [(0.0, (colour[0] * 0.45, colour[1] * 0.45, colour[2] * 0.45)),
+                    (0.55, colour),
+                    (1.0, (min(1, colour[0] * 1.7), min(1, colour[1] * 1.7),
+                           min(1, colour[2] * 1.6)))])
+    split = _mix(nt, _maths(nt, 'MULTIPLY', plates.outputs['Distance'], 0.5).outputs[0],
+                 shaded.outputs['Color'],
+                 (colour[0] * 0.5, colour[1] * 0.5, colour[2] * 0.5, 1.0))
+    mossy = _mix(nt, _ramp(nt, lichen.outputs['Fac'],
+                           [(0.55, (0, 0, 0)), (0.72, (1, 1, 1))]).outputs['Color'],
+                 split.outputs['Color'], (0.30, 0.33, 0.24, 1.0))
+    nt.links.new(mossy.outputs['Color'], bsdf.inputs['Base Color'])
+
+    rough = _ramp(nt, grain.outputs['Fac'], [(0.0, (0.88,) * 3), (1.0, (0.72,) * 3)])
+    nt.links.new(rough.outputs['Color'], bsdf.inputs['Roughness'])
+
+    height = _mix(nt, 0.45, ridges.outputs['Fac'], plates.outputs['Distance'])
+    _bump(nt, bsdf, height.outputs['Color'], strength=0.7, distance=0.010)
+
+    return mat
+
+
+def foliage(name, colour, scale=26.0):
+    """
+    Needles seen as a mass rather than one at a time.
+
+    At the distance a forest is looked at, what reads is the clumping —
+    darker in the shade of the branch above, paler at the tips — so that
+    is what this paints.
+    """
+    mat, nt, bsdf = _mat(name, roughness=0.76, base=colour)
+    bsdf.inputs['Sheen Weight'].default_value = 0.25
+
+    vector = _coords(nt, 1.0)
+
+    clumps = _noise(nt, vector, scale * 0.8, detail=8.0, roughness=0.68)
+    needles = _wave(nt, vector, scale * 9.0, distortion=6.0, detail=3.0, bands='Z')
+    dust = _noise(nt, vector, scale * 6.0, detail=5.0)
+    exposure = _edges(nt, 0.50, 0.58)
+
+    shaded = _ramp(nt, clumps.outputs['Fac'],
+                   [(0.15, (colour[0] * 0.42, colour[1] * 0.42, colour[2] * 0.46)),
+                    (0.55, colour),
+                    (0.90, (min(1, colour[0] * 1.6 + 0.03), min(1, colour[1] * 1.5 + 0.05),
+                            min(1, colour[2] * 1.4 + 0.02)))])
+    tipped = _mix(nt, _maths(nt, 'MULTIPLY', exposure, 0.45).outputs[0],
+                  shaded.outputs['Color'],
+                  (min(1, colour[0] * 1.9 + 0.06), min(1, colour[1] * 1.7 + 0.10),
+                   min(1, colour[2] * 1.6 + 0.04), 1.0))
+    grained = _mix(nt, 0.18, tipped.outputs['Color'], needles.outputs['Color'],
+                   blend='MULTIPLY')
+    nt.links.new(grained.outputs['Color'], bsdf.inputs['Base Color'])
+
+    rough = _ramp(nt, dust.outputs['Fac'], [(0.0, (0.84,) * 3), (1.0, (0.66,) * 3)])
+    nt.links.new(rough.outputs['Color'], bsdf.inputs['Roughness'])
+
+    height = _mix(nt, 0.5, needles.outputs['Fac'], clumps.outputs['Fac'])
+    _bump(nt, bsdf, height.outputs['Color'], strength=0.45, distance=0.006)
+
+    return mat
+
+
+def settled_snow(name, tint=(0.86, 0.90, 0.97), scale=20.0):
+    """
+    Snow that has sat on something for a while: rounded, a little
+    crusted, faintly blue where it is deep.
+    """
+    mat, nt, bsdf = _mat(name, roughness=0.42, base=tint)
+
+    vector = _coords(nt, 1.0)
+
+    drift = _noise(nt, vector, scale * 0.7, detail=7.0, roughness=0.6)
+    crust = _voronoi(nt, vector, scale * 9.0, feature='F1')
+    sparkle = _voronoi(nt, vector, scale * 60.0, feature='F1')
+
+    shaded = _ramp(nt, drift.outputs['Fac'],
+                   [(0.2, (tint[0] * 0.84, tint[1] * 0.88, tint[2] * 0.98)),
+                    (0.8, (min(1, tint[0] * 1.06), min(1, tint[1] * 1.05), 1.0))])
+    nt.links.new(shaded.outputs['Color'], bsdf.inputs['Base Color'])
+
+    rough = _ramp(nt, sparkle.outputs['Distance'], [(0.0, (0.22,) * 3), (0.35, (0.52,) * 3)])
+    nt.links.new(rough.outputs['Color'], bsdf.inputs['Roughness'])
+
+    height = _mix(nt, 0.4, drift.outputs['Fac'], crust.outputs['Distance'])
+    _bump(nt, bsdf, height.outputs['Color'], strength=0.35, distance=0.008)
+
+    return mat
+
+
+def granite(name, colour=(0.235, 0.232, 0.238), scale=9.0):
+    """
+    Granite: a grey ground with lighter feldspar and darker mica in it,
+    weathered pale on the exposed faces and stained in the cracks.
+    """
+    mat, nt, bsdf = _mat(name, roughness=0.74, base=colour)
+
+    vector = _coords(nt, 1.0)
+
+    crystals = _voronoi(nt, vector, scale * 26.0, feature='F1', randomness=1.0)
+    mica = _noise(nt, vector, scale * 40.0, detail=4.0)
+    bedding = _noise(nt, vector, scale * 1.6, detail=8.0, roughness=0.62, distortion=1.2)
+    exposure = _edges(nt, 0.50, 0.57)
+
+    speckled = _ramp(nt, crystals.outputs['Distance'],
+                     [(0.0, (colour[0] * 1.55, colour[1] * 1.5, colour[2] * 1.45)),
+                      (0.35, colour),
+                      (0.8, (colour[0] * 0.62, colour[1] * 0.62, colour[2] * 0.66))])
+    banded = _mix(nt, _maths(nt, 'MULTIPLY', bedding.outputs['Fac'], 0.45).outputs[0],
+                  speckled.outputs['Color'],
+                  (colour[0] * 0.72, colour[1] * 0.70, colour[2] * 0.68, 1.0))
+    weathered = _mix(nt, _maths(nt, 'MULTIPLY', exposure, 0.4).outputs[0],
+                     banded.outputs['Color'], (0.46, 0.46, 0.45, 1.0))
+    nt.links.new(weathered.outputs['Color'], bsdf.inputs['Base Color'])
+
+    rough = _ramp(nt, mica.outputs['Fac'], [(0.0, (0.82,) * 3), (1.0, (0.58,) * 3)])
+    nt.links.new(rough.outputs['Color'], bsdf.inputs['Roughness'])
+
+    height = _mix(nt, 0.55, crystals.outputs['Distance'], bedding.outputs['Fac'])
+    _bump(nt, bsdf, height.outputs['Color'], strength=0.5, distance=0.012)
+
+    return mat
