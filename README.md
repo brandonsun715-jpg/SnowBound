@@ -38,8 +38,12 @@ Assets/
   Prefabs/
   Materials/
   Models/
+  Resources/
+    Models/               the hero models: an FBX and its baked PBR maps
   Audio/
   UI/
+tools/
+  modelgen/               the scripts those models are built by, in Blender
 ```
 
 ## Build order
@@ -121,6 +125,40 @@ post-processing at all.
 6. **Grade** — a restrained colour pipeline built in code. *(done)*
 7. **Hero assets** — a real lodge model, fitted to the placeholder it
    replaces. *(done)*
+
+## Milestone 6 — the things you look at closest
+
+A lift is what the player spends the ride looking at, and their own skis
+are on screen for the whole run. Both were boxes.
+
+1. **A chairlift chair** — grip, hanger, tubular frame, moulded seat and a
+   stowed safety bar. *(done)*
+2. **A line tower** — footing, tapered mast, crossarm and two four-wheel
+   sheave trains, with a ladder and a platform. *(done)*
+3. **A terminal** — bullwheel, drive, portal frame, pitched canopy, lane
+   fences and an operator's hut. *(done)*
+4. **Skis, poles and a board** — pressed from the numbers real ones are
+   specified by, with bindings on them. *(done)*
+5. **A model generator** — every one of them is a script in this repo
+   rather than a binary nobody can edit. *(done)*
+
+## Making a model
+
+The models are built by `tools/modelgen`, which drives Blender as a Python
+module (`pip install bpy`). No Blender install and no GUI:
+
+```
+python3 tools/modelgen/build.py                 every model
+python3 tools/modelgen/build.py chair tower     just those
+python3 tools/modelgen/check.py                 read them back and check them
+```
+
+Each model is modelled from primitives at real sizes, bevelled, unwrapped,
+baked to a base map, a normal map, a roughness map and a metallic map by
+Cycles, and written to `Assets/Resources/Models/<Name>/` as an FBX beside
+its four textures — the same layout the lodge already used. A preview
+render of each goes to `tools/modelgen/preview/`, because a model cannot be
+reviewed by reading its vertex count.
 
 ## Building the scene
 
@@ -382,6 +420,33 @@ was created with; picking the wrong one leaves every button silently dead.
   placeholder and fits itself to it, so swapping an asset in cannot break
   where the player spawns or what anything collides with, and no magic scale
   number is needed per asset.
+- The lift's models are placed rather than measured, because a chair, a
+  tower and a terminal each have one number that has to be right: a chair's
+  seat must land where the rider is seated, a tower's sheaves must sit on
+  the cable, a terminal's bullwheel must be at cable height. Each is scaled
+  by that one number — the drop, the height, the cable — so the rest of the
+  model keeps its proportions instead of being stretched into a box.
+- A model that is missing costs the look of the thing and nothing else.
+  `HeroAssets.Spawn` returns nothing, the caller keeps the boxes it already
+  built, and the game runs exactly as it did before.
+- One material and one mask per model, cached. A lift has dozens of chairs
+  on it, and each one building its own copy of a two-thousand pixel texture
+  is how a scene load turns into a stall.
+- The models are generated, not sculpted. Every one is a Python script in
+  `tools/modelgen` that builds it from primitives at real sizes, so a ski's
+  sidecut is the three numbers a real ski is specified by and changing them
+  is changing the ski. Nothing in this repository is a binary that only one
+  machine can edit.
+- Everything is bevelled, because nothing manufactured has a truly sharp
+  edge — it is cast, pressed, extruded or machined, and every one of those
+  leaves a radius that catches a line of light. It is the cheapest realism
+  in the whole pipeline.
+- Wear is driven off the geometry rather than sprayed over it: how convex a
+  point is says where paint has been knocked off, where zinc has polished
+  and where dirt cannot sit. Ambient occlusion is baked into the base map,
+  because URP has nowhere to put a fourth texture and the contact shading
+  under a seat and around every bolt is most of what stops a model reading
+  as plastic.
 - **The height field is the mountain.** One array of heights; the chunk meshes
   are built from it and each chunk's collider is that same mesh; `SampleHeight`
   is the same bilinear interpolation the triangles perform. So the surface you

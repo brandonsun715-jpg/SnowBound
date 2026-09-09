@@ -86,15 +86,25 @@ namespace SnowBound.Game
                 new Vector3(3.4f, 0.12f, 0.12f), Quaternion.identity, timber);
 
             // Spare gear leaning against it, so the rack reads at a glance.
+            // Stood on their tails against the rail: a ski is tipped back
+            // until it is nearly upright, which puts its own centre a little
+            // under half its length off the ground.
             for (int i = 0; i < 3; i++)
             {
                 float x = -1.1f + i * 0.55f;
-                Bar(root.transform, "RackSki", new Vector3(x, 0.95f, -0.18f),
-                    new Vector3(0.11f, 1.9f, 0.05f), Quaternion.Euler(9f, 0f, 4f), ski);
+                var lean = Quaternion.Euler(-80f, 0f, 4f + i * 2f);
+
+                if (HeroAssets.Spawn(HeroAssets.Ski, root.transform,
+                                     new Vector3(x, 0.86f, -0.18f), lean) == null)
+                    Bar(root.transform, "RackSki", new Vector3(x, 0.95f, -0.18f),
+                        new Vector3(0.11f, 1.9f, 0.05f), Quaternion.Euler(9f, 0f, 4f), ski);
             }
 
-            Bar(root.transform, "RackBoard", new Vector3(1.15f, 0.85f, -0.2f),
-                new Vector3(0.32f, 1.6f, 0.05f), Quaternion.Euler(11f, 0f, -5f), board);
+            if (HeroAssets.Spawn(HeroAssets.Board, root.transform,
+                                 new Vector3(1.15f, 0.78f, -0.20f),
+                                 Quaternion.Euler(-79f, 0f, -6f)) == null)
+                Bar(root.transform, "RackBoard", new Vector3(1.15f, 0.85f, -0.2f),
+                    new Vector3(0.32f, 1.6f, 0.05f), Quaternion.Euler(11f, 0f, -5f), board);
 
             foreach (Transform tr in root.GetComponentsInChildren<Transform>(true))
                 tr.gameObject.hideFlags = HideFlags.DontSaveInEditor;

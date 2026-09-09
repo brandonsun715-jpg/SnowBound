@@ -347,13 +347,20 @@ namespace SnowBound.Lifts
 
                 Quaternion facing = Facing(line, i);
 
-                Slab(root, "TowerFooting", new Vector3(top.x, ground + 0.15f, top.z),
+                // One object per tower, standing on the ground and turned
+                // along the line, so the model has somewhere to stand and the
+                // placeholder has somewhere to be switched off.
+                var tower = new GameObject("Tower");
+                tower.transform.SetParent(root, false);
+                tower.transform.SetPositionAndRotation(new Vector3(top.x, ground, top.z), facing);
+
+                Slab(tower.transform, "TowerFooting", new Vector3(top.x, ground + 0.15f, top.z),
                      facing, new Vector3(1.5f, 0.3f, 1.5f), steel, false);
 
-                Slab(root, "TowerMast", new Vector3(top.x, ground + height * 0.5f, top.z),
+                Slab(tower.transform, "TowerMast", new Vector3(top.x, ground + height * 0.5f, top.z),
                      facing, new Vector3(0.44f, height, 0.44f), steel, true);
 
-                Slab(root, "TowerCrossarm", new Vector3(top.x, top.y + 0.28f, top.z),
+                Slab(tower.transform, "TowerCrossarm", new Vector3(top.x, top.y + 0.28f, top.z),
                      facing, new Vector3(trackSpacing + 1.8f, 0.3f, 0.42f), steel, false);
 
                 // Sheave trains: the wheel packs the cable rides over, hung
@@ -363,12 +370,22 @@ namespace SnowBound.Lifts
                     Vector3 offset = facing * new Vector3(side * trackSpacing * 0.5f, 0f, 0f);
                     Vector3 at = top + offset;
 
-                    Slab(root, "SheaveHanger", new Vector3(at.x, top.y + 0.08f, at.z),
+                    Slab(tower.transform, "SheaveHanger", new Vector3(at.x, top.y + 0.08f, at.z),
                          facing, new Vector3(0.16f, 0.34f, 0.24f), steel, false);
 
-                    Slab(root, "SheaveTrain", new Vector3(at.x, top.y - 0.14f, at.z),
+                    Slab(tower.transform, "SheaveTrain", new Vector3(at.x, top.y - 0.14f, at.z),
                          facing, new Vector3(1.15f, 0.26f, 0.34f), steel, false);
                 }
+
+                // The real tower. Scaled by its height, so the sheaves come
+                // out level with the cable whatever this lift's towers stand
+                // at, and the mast keeps its proportions instead of being
+                // stretched into a lamp post.
+                GameObject model = HeroAssets.Spawn(HeroAssets.Tower, tower.transform,
+                                                    Vector3.zero, Quaternion.identity,
+                                                    height / HeroAssets.TowerHeight);
+
+                if (model != null) HeroAssets.Hide(tower.transform, model);
             }
         }
 
@@ -420,6 +437,16 @@ namespace SnowBound.Lifts
                 float approach = end == 0 ? 1f : -1f;
 
                 BuildStation(station.transform, cable, approach, ground, steel, shell);
+
+                // The real terminal, scaled so its bullwheel ends up on the
+                // cable. It is built fore-and-aft symmetric, so the same model
+                // serves the bottom station and the top one without being
+                // turned round.
+                GameObject model = HeroAssets.Spawn(HeroAssets.Station, station.transform,
+                                                    Vector3.zero, Quaternion.identity,
+                                                    cable / HeroAssets.StationCable);
+
+                if (model != null) HeroAssets.Hide(station.transform, model);
             }
         }
 
@@ -582,6 +609,21 @@ namespace SnowBound.Lifts
                     case LiftKind.Surface: BuildBar(go.transform, seatY, steel); break;
                     case LiftKind.Gondola: BuildCabin(go.transform, seatY, chairMat, steel); break;
                     default: BuildSeat(go.transform, seatY, chairMat, steel); break;
+                }
+
+                // The real chair, hung from exactly the point the placeholder
+                // hangs from. It is scaled by the drop, so the seat lands at
+                // the same height the rider is seated at, and stretched across
+                // by the number the lift seats: a six-pack is a wider chair,
+                // not a taller one.
+                if (!Towed && kind != LiftKind.Gondola)
+                {
+                    float drop = hangerLength / HeroAssets.ChairDrop;
+                    GameObject model = HeroAssets.Spawn(
+                        HeroAssets.Chair, go.transform, Vector3.zero, Quaternion.identity,
+                        new Vector3(Mathf.Max(2, seats) * 0.25f, drop, drop));
+
+                    if (model != null) HeroAssets.Hide(go.transform, model);
                 }
 
                 var seat = new GameObject("Seat Point");

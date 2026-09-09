@@ -25,13 +25,8 @@ namespace SnowBound.Buildings
         const string ContainerName = "HeroModel";
 
         [Header("Asset")]
-        [Tooltip("Path under a Resources folder, without the extension.")]
+        [Tooltip("Path under a Resources folder, without the extension. The\nmaps are the ones named after it in the same folder.")]
         public string modelPath = "Models/Lodge/Lodge";
-        [Tooltip("Textures beside it. Leave a name empty to skip that map.")]
-        public string albedoPath = "Models/Lodge/Lodge_Albedo";
-        public string normalPath = "Models/Lodge/Lodge_Normal";
-        public string metallicPath = "Models/Lodge/Lodge_Metallic";
-        public string roughnessPath = "Models/Lodge/Lodge_Roughness";
 
         [Header("Fit")]
         [Tooltip("Scale relative to the placeholder it replaces. One means the same size.")]
@@ -284,43 +279,21 @@ namespace SnowBound.Buildings
         }
 
         /// <summary>
-        /// Build the material from the maps that shipped beside the model.
+        /// Put the model's own baked maps on it.
         ///
-        /// URP wants metallic in red and smoothness in alpha of one texture,
-        /// and the asset arrives with metallic and roughness as two. They are
-        /// combined here, at a smaller size, because that map carries no fine
-        /// detail worth two thousand pixels and combining at full size costs a
-        /// visible pause on load.
+        /// The material comes from HeroAssets, which caches one per model:
+        /// the maps behind it are two thousand pixels square and combining
+        /// them is not something to do twice.
         /// </summary>
         bool Dress(GameObject instance)
         {
-            var albedo = Load(albedoPath);
+            Material material = HeroAssets.Surface(Folder, smoothnessScale, maskResolution);
 
-            if (albedo == null)
+            if (material == null)
             {
-                Problem = "No texture at Resources/" + albedoPath;
+                Problem = "No textures beside Resources/" + modelPath;
                 return false;
             }
-
-            var maps = new SurfaceMaps
-            {
-                albedo = albedo,
-                normal = Load(normalPath),
-                mask = CombineMask()
-            };
-
-            // One tile across the whole model: it is properly unwrapped, unlike
-            // everything this project generates for itself.
-            Material material = MaterialFactory.CreateSurface(name + "Model", maps, Color.white, 1f, 1f);
-            if (material == null) return false;
-
-            // The model is properly unwrapped, so one tile across the whole of
-            // it rather than the metre-based tiling everything generated uses.
-            if (material.HasProperty("_BaseMap")) material.SetTextureScale("_BaseMap", Vector2.one);
-            else if (material.HasProperty("_MainTex")) material.SetTextureScale("_MainTex", Vector2.one);
-
-            if (material.HasProperty("_BumpMap")) material.SetTextureScale("_BumpMap", Vector2.one);
-            if (material.HasProperty("_MetallicGlossMap")) material.SetTextureScale("_MetallicGlossMap", Vector2.one);
 
             foreach (Renderer r in instance.GetComponentsInChildren<Renderer>(true))
             {
@@ -335,81 +308,16 @@ namespace SnowBound.Buildings
             return true;
         }
 
-        Texture2D Load(string path)
+        /// <summary>The folder the model and its maps share, which is what
+        /// they are all named after.</summary>
+        string Folder
         {
-            return string.IsNullOrEmpty(path) ? null : Resources.Load<Texture2D>(path);
-        }
-
-        Texture2D _mask;
-
-        Texture2D CombineMask()
-        {
-            if (_mask != null) return _mask;
-
-            Texture2D metallic = Load(metallicPath);
-            Texture2D roughness = Load(roughnessPath);
-
-            if (metallic == null && roughness == null) return null;
-
-            int size = Mathf.Clamp(Mathf.ClosestPowerOfTwo(maskResolution), 64, 2048);
-
-            Color[] metal = Sample(metallic, size);
-            Color[] rough = Sample(roughness, size);
-
-            var pixels = new Color32[size * size];
-
-            for (int i = 0; i < pixels.Length; i++)
+            get
             {
-                float m = metal != null ? metal[i].r : 0f;
-
-                // Smoothness is the opposite of roughness. Getting this the
-                // wrong way round makes wood shiny and metal matte, which is
-                // the most common reason an imported asset looks like plastic.
-                float s = rough != null ? 1f - rough[i].r : 0.35f;
-
-                pixels[i] = new Color32((byte)(Mathf.Clamp01(m) * 255f), 0, 0,
-                                        (byte)(Mathf.Clamp01(s * smoothnessScale) * 255f));
+                string path = modelPath.Replace("\\", "/");
+                int cut = path.LastIndexOf('/');
+                return cut < 0 ? path : path.Substring(cut + 1);
             }
-
-            _mask = new Texture2D(size, size, TextureFormat.RGBA32, true, true)
-            {
-                name = name + "Mask",
-                wrapMode = TextureWrapMode.Clamp,
-                filterMode = FilterMode.Bilinear,
-                hideFlags = HideFlags.DontSave
-            };
-
-            _mask.SetPixels32(pixels);
-            _mask.Apply(true, false);
-
-            return _mask;
-        }
-
-        /// <summary>Read a texture down to a square of the given size.</summary>
-        static Color[] Sample(Texture2D source, int size)
-        {
-            if (source == null) return null;
-
-            var pixels = new Color[size * size];
-
-            try
-            {
-                for (int y = 0; y < size; y++)
-                {
-                    float v = (y + 0.5f) / size;
-
-                    for (int x = 0; x < size; x++)
-                        pixels[y * size + x] = source.GetPixelBilinear((x + 0.5f) / size, v);
-                }
-            }
-            catch (UnityException)
-            {
-                // Not marked readable. The import settings ask for it, but a
-                // project that has not reimported yet should not throw.
-                return null;
-            }
-
-            return pixels;
         }
 
         void HidePlaceholder()

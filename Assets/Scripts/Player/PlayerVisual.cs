@@ -107,6 +107,15 @@ namespace SnowBound.Player
                  new Vector3(0f, 1.70f, 0.13f), new Vector3(0.28f, 0.09f, 0.08f), gearMat);
         }
 
+        /// <summary>
+        /// Skis and poles. Real models where the project has them, boxes
+        /// where it does not, so the game still runs with the models
+        /// missing — and both stand in exactly the same place, because the
+        /// rider's stance is what the locomotion code was tuned against.
+        ///
+        /// The models are built at true size, tip forward and base on the
+        /// ground, so they need positioning and no scaling at all.
+        /// </summary>
         void BuildSkis(Transform root, Material gearMat, Material poleMat)
         {
             var skis = new GameObject("Skis");
@@ -115,13 +124,21 @@ namespace SnowBound.Player
 
             for (int side = -1; side <= 1; side += 2)
             {
-                Part(_skis, PrimitiveType.Cube, "Ski",
-                     new Vector3(side * 0.15f, 0.03f, 0.20f),
-                     new Vector3(0.12f, 0.05f, 1.75f), gearMat);
+                // The model's binding is at its own origin, so putting that
+                // at the rider's feet is all the placing it needs.
+                var at = new Vector3(side * 0.15f, 0f, 0f);
 
-                Part(_skis, PrimitiveType.Cube, "Pole",
-                     new Vector3(side * 0.44f, 0.62f, -0.08f),
-                     new Vector3(0.045f, 1.25f, 0.045f), poleMat);
+                if (HeroAssets.Spawn(HeroAssets.Ski, _skis, at, Quaternion.identity) == null)
+                    Part(_skis, PrimitiveType.Cube, "Ski",
+                         new Vector3(side * 0.15f, 0.03f, 0.20f),
+                         new Vector3(0.12f, 0.05f, 1.75f), gearMat);
+
+                var held = new Vector3(side * 0.44f, 0f, -0.08f);
+
+                if (HeroAssets.Spawn(HeroAssets.Pole, _skis, held, Quaternion.identity) == null)
+                    Part(_skis, PrimitiveType.Cube, "Pole",
+                         new Vector3(side * 0.44f, 0.62f, -0.08f),
+                         new Vector3(0.045f, 1.25f, 0.045f), poleMat);
             }
         }
 
@@ -130,6 +147,9 @@ namespace SnowBound.Player
             var board = new GameObject("Snowboard");
             board.transform.SetParent(root, false);
             _board = board.transform;
+
+            if (HeroAssets.Spawn(HeroAssets.Board, _board, new Vector3(0f, 0f, 0.02f),
+                                 Quaternion.identity) != null) return;
 
             Part(_board, PrimitiveType.Cube, "Board",
                  new Vector3(0f, 0.03f, 0.05f), new Vector3(0.34f, 0.05f, 1.55f), gearMat);

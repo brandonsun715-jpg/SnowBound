@@ -40,3 +40,9 @@ Thumbs.db
 # Crash reports
 sysinfo.txt
 crashlytics-build.properties
+
+# The model generator's own output that is not an asset: preview renders
+# it makes so its models can be looked at, and Python's caches.
+tools/modelgen/preview/
+__pycache__/
+*.pyc
