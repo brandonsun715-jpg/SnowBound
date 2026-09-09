@@ -475,17 +475,28 @@ was created with; picking the wrong one leaves every button silently dead.
   doing — its speed and its sideways slip — rather than off the keyboard,
   the same rule the spray and the audio follow, so a rider washing out
   sideways leans whether or not anybody is holding a key down.
+- A track is a groove, not a stain, so new snow fills it back in rather than
+  fading it out — at the rate it is actually snowing, and not at all on a
+  clear day, when the line you cut in the morning is still there in the
+  afternoon.
 - Nothing in the base area is scattered. A bench faces the lodge because
   that is where you sit and look, a bin stands beside a bench, and a fence
   goes where the ground beyond the edge of the run actually drops away —
   measured by sampling it, so fences end up along the cliff side of a
   traverse and nowhere along an open bowl.
+- Anything that lies on the ground takes the tilt of the ground: benches,
+  bins, snow piles and fence panels. A fence panel laid level across a fall
+  line has one end buried and the other in the air. Lamp posts and signs stay
+  upright, because those are dug in.
 - A guest is not a rig. The player is fifteen parts because the game bends
   their knees onto a chairlift; a guest is only ever moved, so a guest is
   the same rider welded into one mesh — which is fewer renderers than the
   four primitives they used to be. The jacket colour tints the whole rider
   through a property block, so a crowd of forty wears forty jackets and
-  costs one material and one texture.
+  costs one material and one texture. Being one mesh is also why a skiing
+  guest takes most of the slope rather than standing straight up on it, and
+  leans into a turn by how fast the line they are following is bending: they
+  cannot bend at the knee, so the lean has to be the whole of them.
 - Snow is modelled where snow settles rather than paint on a texture: on
   the terminal roof it lies on the panels and stops short of the eaves,
   because that is where it breaks off.
@@ -504,6 +515,13 @@ was created with; picking the wrong one leaves every button silently dead.
   with slope, with altitude and inside scoured fields, and its size falls
   with altitude — boulders low where they rolled to, scree high where it
   broke off.
+- A cliff is not a big boulder. What reads as one is a line of flat-topped
+  slabs along a single contour — the bed the rock broke along — with the odd
+  tooth left standing above it, all of it sunk by a share of its own height
+  so the rock comes out of the mountain instead of resting on it. Bands only
+  go on ground steeper than thirty-two degrees and give up rather than settle
+  for flat, and they are planned before anything is planted, so no pine grows
+  out of the middle of a slab.
 - Eighteen hundred trees cannot be eighteen hundred objects, so the forest
   is not spawned — the models' meshes are read, placed and welded into a
   handful of batched ones, exactly as the procedural trees were. Three
