@@ -35,6 +35,7 @@ def materials():
         'rubber': S.rubber("SheaveLiner"),
         'concrete': S.concrete("TowerFooting"),
         'sign': S.powder_coat("TowerSign", YELLOW, roughness=0.34, wear=0.5, dirt=0.5),
+        'snow': S.settled_snow("TowerSnow"),
     }
 
 
@@ -50,10 +51,43 @@ def build(mats=None):
     # One train, built at the origin, then stood out at each end of the
     # crossarm. The second is the first turned round rather than a mirror,
     # so the two hang the same way up.
+    parts += weather(m)
+
     train = sheaves(m, "A")
     kit.place(train, (SPACING * 0.5, 0, 0))
     parts.append(train)
     parts.append(kit.clone(train, rot=(0, 0, 180)))
+
+    return parts
+
+
+def weather(m):
+    """
+    What settles on it between storms.
+
+    Snow lies on anything facing up and wide enough to hold it: the top of
+    the crossarm, the platform, the footing. A lift tower with no snow on it
+    in the middle of a snowfield is the sort of thing you do not notice
+    until it is there.
+    """
+    parts = []
+
+    ridge = kit.loft("ArmSnow", [
+        [(x, y, z) for x, y, z in shapes.circle(0.118, -SPACING * 0.5 - 0.36, count=10)],
+        [(x, y, z) for x, y, z in shapes.circle(0.126, SPACING * 0.5 + 0.36, count=10)],
+    ], closed_ends=True, mat=m['snow'])
+    kit.place(ridge, rot=(0, 90, 0))
+    ridge.location = (0, 0, HEIGHT + 0.11)
+    kit.apply_transform(ridge)
+    parts.append(kit.smooth(ridge, angle=40))
+
+    deck = kit.box("PlatformSnow", (1.24, 0.80, 0.05), (0, 0.50, HEIGHT - 0.66), mat=m['snow'])
+    kit.bevel(deck, 0.010, segments=2)
+    parts.append(deck)
+
+    pad = kit.box("FootingSnow", (1.86, 1.86, 0.06), (0, 0, 0.49), mat=m['snow'])
+    kit.bevel(pad, 0.020, segments=2)
+    parts.append(pad)
 
     return parts
 

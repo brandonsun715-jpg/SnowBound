@@ -153,6 +153,124 @@ namespace SnowBound.Core
             return piece.Valid ? piece : null;
         }
 
+        static readonly Dictionary<string, Mesh> Welded = new Dictionary<string, Mesh>();
+
+        /// <summary>
+        /// Every part of a model welded into one mesh.
+        ///
+        /// A rider is fifteen parts so the player can bend at the knees, but
+        /// forty guests do not bend at the knees — they walk, ride and ski
+        /// past — and forty times fifteen renderers is six hundred of them.
+        /// Welded once and shared, a guest is one.
+        /// </summary>
+        public static Mesh Merged(string folder)
+        {
+            Mesh mesh;
+            if (Welded.TryGetValue(folder, out mesh) && mesh != null) return mesh;
+
+            GameObject prefab = Prefab(folder);
+            if (prefab == null) { Welded[folder] = null; return null; }
+
+            var pieces = new List<CombineInstance>();
+            Matrix4x4 into = prefab.transform.worldToLocalMatrix;
+
+            foreach (MeshFilter filter in prefab.GetComponentsInChildren<MeshFilter>(true))
+            {
+                Mesh part = filter.sharedMesh;
+                if (part == null || !part.isReadable) continue;
+
+                Matrix4x4 place = into * filter.transform.localToWorldMatrix;
+
+                // One instance per sub-mesh: a part that was joined from
+                // several materials has several, and taking only the first
+                // would weld a rider with no jacket on.
+                for (int sub = 0; sub < part.subMeshCount; sub++)
+                    pieces.Add(new CombineInstance { mesh = part, subMeshIndex = sub, transform = place });
+            }
+
+            if (pieces.Count == 0)
+            {
+                Welded[folder] = null;
+                return null;
+            }
+
+            mesh = new Mesh { name = folder + "Merged", hideFlags = HideFlags.DontSave };
+            mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+            mesh.CombineMeshes(pieces.ToArray(), true, true);
+            mesh.RecalculateBounds();
+
+            Welded[folder] = mesh;
+            return mesh;
+        }
+
+        /// <summary>
+        /// One model welded to itself twice, at two places: a pair of skis
+        /// as a single mesh.
+        /// </summary>
+        public static Mesh Pair(string folder, Vector3 left, Vector3 right)
+        {
+            string key = folder + "@pair";
+
+            Mesh mesh;
+            if (Welded.TryGetValue(key, out mesh) && mesh != null) return mesh;
+
+            Mesh one = Merged(folder);
+            if (one == null) { Welded[key] = null; return null; }
+
+            var pieces = new[]
+            {
+                new CombineInstance { mesh = one, transform = Matrix4x4.Translate(left) },
+                new CombineInstance { mesh = one, transform = Matrix4x4.Translate(right) }
+            };
+
+            mesh = new Mesh { name = folder + "Pair", hideFlags = HideFlags.DontSave };
+            mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+            mesh.CombineMeshes(pieces, true, true);
+            mesh.RecalculateBounds();
+
+            Welded[key] = mesh;
+            return mesh;
+        }
+
+        /// <summary>
+        /// A renderer showing one welded model, tinted. The tint multiplies
+        /// the baked texture, so a crowd can wear forty jackets without forty
+        /// materials or forty textures.
+        /// </summary>
+        public static GameObject Stand(string folder, Mesh mesh, Transform parent, string name,
+                                       Vector3 localPosition, Quaternion localRotation,
+                                       Vector3 scale, Color tint)
+        {
+            if (mesh == null) return null;
+
+            Material material = Surface(folder);
+            if (material == null) return null;
+
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = localPosition;
+            go.transform.localRotation = localRotation;
+            go.transform.localScale = scale;
+            go.hideFlags = HideFlags.DontSaveInEditor;
+
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+
+            var renderer = go.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = material;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+            renderer.receiveShadows = true;
+
+            if (tint != Color.white)
+            {
+                var block = new MaterialPropertyBlock();
+                block.SetColor("_BaseColor", tint);
+                block.SetColor("_Color", tint);
+                renderer.SetPropertyBlock(block);
+            }
+
+            return go;
+        }
+
         /// <summary>Find one named object inside a model.</summary>
         public static Transform Part(Transform root, string name)
         {

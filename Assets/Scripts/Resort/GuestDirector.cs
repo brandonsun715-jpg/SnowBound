@@ -184,8 +184,14 @@ namespace SnowBound.Resort
             go.transform.SetParent(_crowd, false);
             go.hideFlags = HideFlags.DontSaveInEditor;
 
+            // What they ride is chosen before they are built, because a
+            // skier and a snowboarder are two different models: they do not
+            // stand the same way.
+            LocomotionKind kind = Random.value < 0.32f
+                ? LocomotionKind.Snowboard : LocomotionKind.Ski;
+
             Transform skis, board;
-            GuestAppearance.Build(go.transform,
+            GuestAppearance.Build(go.transform, kind,
                                   _jackets[Random.Range(0, _jackets.Length)],
                                   _trousers, _skin, _gear, out skis, out board);
 
@@ -193,7 +199,7 @@ namespace SnowBound.Resort
             guest.ability = Mathf.Clamp01(Random.value * 0.85f + 0.1f);
             guest.money = Random.Range(90f, 320f);
             guest.happiness = Mathf.Clamp01(Random.Range(0.60f, 0.85f) + AmenityHappiness());
-            guest.gear = Random.value < 0.32f ? LocomotionKind.Snowboard : LocomotionKind.Ski;
+            guest.gear = kind;
             guest.preferredPiste = ChoosePiste(guest.ability);
             guest.run = mountain.TrailAt(guest.preferredPiste);
 

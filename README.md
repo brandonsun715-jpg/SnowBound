@@ -149,8 +149,15 @@ are on screen for the whole run. Both were boxes.
    line; blown-down trunks and stumps inside the stands, bare bushes in the
    gaps; boulders low, scree high, and rock where the mountain is steep.
    *(done)*
-8. **A model generator** — every one of them is a script in this repo
-   rather than a binary nobody can edit. *(done)*
+8. **A crowd rather than capsules** — guests are the same riders, welded
+   into one mesh and tinted, so forty of them cost two renderers each
+   instead of four primitives. *(done)*
+9. **Snow that settles on things** — on the terminal roof, the tower
+   crossarm and footing, the chair's back and bar. *(done)*
+10. **One dial for how much machine it uses** — Low to Ultra, scaling what
+    is planted, how far you see, and how far shadows are cast. *(done)*
+11. **A model generator** — every one of them is a script in this repo
+    rather than a binary nobody can edit. *(done)*
 
 ## Making a model
 
@@ -459,6 +466,19 @@ was created with; picking the wrong one leaves every button silently dead.
   the game still runs, on boxes, and still sits down properly.
 - Poles hang off the hands that hold them rather than floating beside the
   rider, and the skis and the board follow the feet onto the chairlift.
+- A guest is not a rig. The player is fifteen parts because the game bends
+  their knees onto a chairlift; a guest is only ever moved, so a guest is
+  the same rider welded into one mesh — which is fewer renderers than the
+  four primitives they used to be. The jacket colour tints the whole rider
+  through a property block, so a crowd of forty wears forty jackets and
+  costs one material and one texture.
+- Snow is modelled where snow settles rather than paint on a texture: on
+  the terminal roof it lies on the panels and stops short of the eaves,
+  because that is where it breaks off.
+- Quality is one dial, and every level is a whole setting rather than a
+  switch that turns an effect off and leaves the scene looking broken. It
+  scales what is planted, how far you can see, how far shadows are cast and
+  how many cascades they use — in the order those things cost.
 - A forest scattered evenly is a plantation. Trees grow where trees already
   are, so the scatter is multiplied by two octaves of noise — one for the
   stands, one for the gaps inside them — and thins and shortens with

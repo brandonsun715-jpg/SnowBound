@@ -51,6 +51,7 @@ def materials():
         'timber': S.timber("StationTimber"),
         'glass': S.glass("StationGlass"),
         'warn': S.powder_coat("StationWarn", WARN, roughness=0.34, wear=0.6, dirt=0.35),
+        'snow': S.settled_snow("StationSnow"),
     }
 
 
@@ -58,7 +59,46 @@ def build(mats=None):
     m = mats or materials()
 
     return (pad(m) + legs(m) + bullwheel(m) + drive(m) + canopy(m) +
-            rails(m) + fences(m) + hut(m) + access(m))
+            rails(m) + fences(m) + hut(m) + access(m) + weather(m))
+
+
+def weather(m):
+    """
+    The snow on the roof, which is most of what a terminal looks like from
+    anywhere on the mountain.
+
+    It lies on the panels themselves, thicker toward the eaves where it
+    slides to and stops, and on the ridge, the walkways and the hut. It
+    stops short of the eaves because that is where it breaks off.
+    """
+    parts = []
+
+    pitch = math.degrees(math.atan2(RIDGE - EAVE, ROOF_HALF))
+    slope = math.hypot(ROOF_HALF, RIDGE - EAVE)
+
+    for side in (-1, 1):
+        lying = kit.box("RoofSnow", (slope - 0.30, 2 * LENGTH + 0.6, 0.11),
+                        (side * ROOF_HALF * 0.5, 0, (EAVE + RIDGE) * 0.5 + 0.11),
+                        rot=(0, side * pitch, 0), mat=m['snow'])
+        kit.bevel(lying, 0.030, segments=2)
+        parts.append(lying)
+
+        walk = kit.box("DeckSnow", (1.20, 3.70, 0.05), (side * 2.35, 0, CABLE + 1.12),
+                       mat=m['snow'])
+        kit.bevel(walk, 0.010, segments=2)
+        parts.append(walk)
+
+    cap = kit.box("RidgeSnow", (0.72, 2 * LENGTH + 0.7, 0.10), (0, 0, RIDGE + 0.16),
+                  mat=m['snow'])
+    kit.bevel(cap, 0.024, segments=2)
+    parts.append(cap)
+
+    hut_top = kit.box("HutSnow", (2.40, 2.10, 0.09), (-4.55, 3.30, 2.72), rot=(4, 0, 0),
+                      mat=m['snow'])
+    kit.bevel(hut_top, 0.020, segments=2)
+    parts.append(hut_top)
+
+    return parts
 
 
 def pad(m):

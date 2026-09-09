@@ -218,6 +218,11 @@ namespace SnowBound.EditorTools
             // make clicking the snow indistinguishable from clicking the park.
             go.AddComponent<FarRange>().Build();
 
+            // One dial for how much machine the mountain may use. It plants
+            // the forest, so it goes on after the props exist.
+            if (Object.FindAnyObjectByType<SnowBound.Core.QualityDirector>() == null)
+                go.AddComponent<SnowBound.Core.QualityDirector>();
+
             // The park exists as a component but is not raised: a new resort
             // has one lodge and a bare mountain, and everything else is the
             // player's decision.

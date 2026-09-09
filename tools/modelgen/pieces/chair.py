@@ -38,12 +38,37 @@ def materials():
         'seat': S.seat_pad("ChairSeat", (0.075, 0.095, 0.130, 1.0)),
         'grip': S.powder_coat("ChairBar", WARM, roughness=0.32, wear=0.75, dirt=0.25),
         'rubber': S.rubber("ChairRubber"),
+        'snow': S.settled_snow("ChairSnow"),
     }
 
 
 def build(mats=None):
     m = mats or materials()
-    return grip(m) + hanger(m) + frame(m) + seat(m) + bar(m)
+    return grip(m) + hanger(m) + frame(m) + seat(m) + bar(m) + weather(m)
+
+
+def weather(m):
+    """
+    Snow on the top edges, where it lands and stays: along the back of the
+    seat, on the raised bar and its footrest, and on the grip.
+    """
+    parts = []
+
+    back = kit.box("BackSnow", (2.0 * HALF - 0.06, 0.075, 0.030),
+                   (0, 0.316, SEAT + 0.628), mat=m['snow'])
+    kit.bevel(back, 0.008, segments=2)
+    parts.append(back)
+
+    rest = kit.box("RestSnow", (2.0 * HALF - 0.30, 0.130, 0.024),
+                   (0, 0.045, SEAT + 0.955), rot=(62, 0, 0), mat=m['snow'])
+    kit.bevel(rest, 0.006, segments=2)
+    parts.append(rest)
+
+    cap = kit.box("GripSnow", (0.145, 0.310, 0.026), (0, 0, 0.022), mat=m['snow'])
+    kit.bevel(cap, 0.008, segments=2)
+    parts.append(cap)
+
+    return parts
 
 
 def slab(name, section, x0, x1, mat, stations=2, taper=None, base=SEAT):
