@@ -42,7 +42,9 @@ namespace SnowBound.EditorTools
             // reference to a destroyed window.
             EditorWindow view = null;
 
-            foreach (Object candidate in Resources.FindObjectsOfTypeAll(gameViewType))
+            // Spelled out, because this file also uses System, where Object
+            // means something else entirely and the compiler refuses to guess.
+            foreach (UnityEngine.Object candidate in Resources.FindObjectsOfTypeAll(gameViewType))
             {
                 view = candidate as EditorWindow;
                 if (view != null) break;
