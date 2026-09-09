@@ -38,8 +38,12 @@ Assets/
   Prefabs/
   Materials/
   Models/
+  Resources/
+    Models/               the hero models: an FBX and its baked PBR maps
   Audio/
   UI/
+tools/
+  modelgen/               the scripts those models are built by, in Blender
 ```
 
 ## Build order
@@ -121,6 +125,62 @@ post-processing at all.
 6. **Grade** — a restrained colour pipeline built in code. *(done)*
 7. **Hero assets** — a real lodge model, fitted to the placeholder it
    replaces. *(done)*
+
+## Milestone 6 — the things you look at closest
+
+A lift is what the player spends the ride looking at, and their own skis
+are on screen for the whole run. Both were boxes.
+
+1. **A chairlift chair** — grip, hanger, tubular frame, moulded seat and a
+   stowed safety bar. *(done)*
+2. **A line tower** — footing, tapered mast, crossarm and two four-wheel
+   sheave trains, with a ladder and a platform. *(done)*
+3. **A terminal** — bullwheel, drive, portal frame, pitched canopy, lane
+   fences and an operator's hut. *(done)*
+4. **Skis, poles and a board** — pressed from the numbers real ones are
+   specified by, with bindings on them. *(done)*
+5. **The player** — a skier and a snowboarder, baggy park kit, hood, big
+   lens, mittens; fifteen parts each so they still bend. *(done)*
+6. **The mountain itself** — three conifers and three boulders, batched in
+   their thousands; a shaped kicker on a levelled pad, a jib box and a
+   rail. *(done)*
+7. **An ecology rather than a scatter** — the forest clumps into stands with
+   clearings, shortens with altitude, and gives way to scrub at the tree
+   line; blown-down trunks and stumps inside the stands, bare bushes in the
+   gaps; boulders low, scree high, and rock where the mountain is steep.
+   *(done)*
+8. **A crowd rather than capsules** — guests are the same riders, welded
+   into one mesh and tinted, so forty of them cost two renderers each
+   instead of four primitives. *(done)*
+9. **Snow that settles on things** — on the terminal roof, the tower
+   crossarm and footing, the chair's back and bar. *(done)*
+10. **One dial for how much machine it uses** — Low to Ultra, scaling what
+    is planted, how far you see, and how far shadows are cast. *(done)*
+11. **A rider who rides** — leans into the turn, folds up over the speed,
+    tucks in the air, off what the body is actually doing. *(done)*
+12. **A resort with things in it** — benches, bins, lamps, run signs, safety
+    fencing where the ground falls away, and pushed snow. *(done)*
+13. **A model generator** — every one of them is a script in this repo
+    rather than a binary nobody can edit. *(done)*
+
+## Making a model
+
+The models are built by `tools/modelgen`, which drives Blender as a Python
+module (`pip install bpy`). No Blender install and no GUI:
+
+```
+python3 tools/modelgen/build.py                 every model
+python3 tools/modelgen/build.py chair skier     just those
+python3 tools/modelgen/check.py                 read them back and check them
+python3 tools/modelgen/proof.py skier           render one wearing its own maps
+```
+
+Each model is modelled from primitives at real sizes, bevelled, unwrapped,
+baked to a base map, a normal map, a roughness map and a metallic map by
+Cycles, and written to `Assets/Resources/Models/<Name>/` as an FBX beside
+its four textures — the same layout the lodge already used. A preview
+render of each goes to `tools/modelgen/preview/`, because a model cannot be
+reviewed by reading its vertex count.
 
 ## Building the scene
 
@@ -382,6 +442,133 @@ was created with; picking the wrong one leaves every button silently dead.
   placeholder and fits itself to it, so swapping an asset in cannot break
   where the player spawns or what anything collides with, and no magic scale
   number is needed per asset.
+- The lift's models are placed rather than measured, because a chair, a
+  tower and a terminal each have one number that has to be right: a chair's
+  seat must land where the rider is seated, a tower's sheaves must sit on
+  the cable, a terminal's bullwheel must be at cable height. Each is scaled
+  by that one number — the drop, the height, the cable — so the rest of the
+  model keeps its proportions instead of being stretched into a box.
+- A model that is missing costs the look of the thing and nothing else.
+  `HeroAssets.Spawn` returns nothing, the caller keeps the boxes it already
+  built, and the game runs exactly as it did before.
+- The riders are a rig, not a mesh. Fifteen parts, each with its origin on
+  the joint it turns about and parented into a chain, so `PlayerVisual` can
+  bend the knees to sit somebody on a chairlift and turn the shoulders
+  across a board by setting `localRotation` on parts it finds by name. No
+  armature, no skinning, no avatar and no animation clips — which is also
+  why every joint is covered by a cuff, a hem or a sleeve.
+- A skier and a snowboarder are two models rather than one body with
+  different gear, because they do not stand the same way. A boarder's feet
+  are strapped fore and aft half a metre apart and both knees drive toward
+  the toe edge, so their legs are not a mirrored pair; a skier's are.
+- The shoulders turn, not the whole rider. A snowboarder's feet cannot
+  leave the board, so `SnowboardMode`'s body yaw is applied to the torso
+  and the hips stay planted — which is what makes the stance read as riding
+  rather than as standing sideways.
+- The fallback body is built round the same joints as the models, so there
+  is one piece of posing code rather than two. If the models are missing
+  the game still runs, on boxes, and still sits down properly.
+- Poles hang off the hands that hold them rather than floating beside the
+  rider, and the skis and the board follow the feet onto the chairlift.
+- The rider stands the way the ride is going: leaning into the turn, folded
+  over the speed, tucked in the air. All three come off what the body is
+  doing — its speed and its sideways slip — rather than off the keyboard,
+  the same rule the spray and the audio follow, so a rider washing out
+  sideways leans whether or not anybody is holding a key down.
+- A track is a groove, not a stain, so new snow fills it back in rather than
+  fading it out — at the rate it is actually snowing, and not at all on a
+  clear day, when the line you cut in the morning is still there in the
+  afternoon.
+- Nothing in the base area is scattered. A bench faces the lodge because
+  that is where you sit and look, a bin stands beside a bench, and a fence
+  goes where the ground beyond the edge of the run actually drops away —
+  measured by sampling it, so fences end up along the cliff side of a
+  traverse and nowhere along an open bowl.
+- Anything that lies on the ground takes the tilt of the ground: benches,
+  bins, snow piles and fence panels. A fence panel laid level across a fall
+  line has one end buried and the other in the air. Lamp posts and signs stay
+  upright, because those are dug in.
+- A guest is not a rig. The player is fifteen parts because the game bends
+  their knees onto a chairlift; a guest is only ever moved, so a guest is
+  the same rider welded into one mesh — which is fewer renderers than the
+  four primitives they used to be. The jacket colour tints the whole rider
+  through a property block, so a crowd of forty wears forty jackets and
+  costs one material and one texture. Being one mesh is also why a skiing
+  guest takes most of the slope rather than standing straight up on it, and
+  leans into a turn by how fast the line they are following is bending: they
+  cannot bend at the knee, so the lean has to be the whole of them.
+- Snow is modelled where snow settles rather than paint on a texture: on
+  the terminal roof it lies on the panels and stops short of the eaves,
+  because that is where it breaks off.
+- Quality is one dial, and every level is a whole setting rather than a
+  switch that turns an effect off and leaves the scene looking broken. It
+  scales what is planted, how far you can see, how far shadows are cast and
+  how many cascades they use — in the order those things cost.
+- A forest scattered evenly is a plantation. Trees grow where trees already
+  are, so the scatter is multiplied by two octaves of noise — one for the
+  stands, one for the gaps inside them — and thins and shortens with
+  altitude before it gives out at the tree line. What is between the trees
+  is placed by the same logic: scrub above the line, bare bushes in the
+  clearings, and blown-down trunks and stumps only inside a stand, where
+  something was standing to fall over.
+- Rocks are placed by geology rather than sprinkled: the chance of one rises
+  with slope, with altitude and inside scoured fields, and its size falls
+  with altitude — boulders low where they rolled to, scree high where it
+  broke off.
+- A cliff is not a big boulder. What reads as one is a line of flat-topped
+  slabs along a single contour — the bed the rock broke along — with the odd
+  tooth left standing above it, all of it sunk by a share of its own height
+  so the rock comes out of the mountain instead of resting on it. Bands only
+  go on ground steeper than thirty-two degrees and give up rather than settle
+  for flat, and they are planned before anything is planted, so no pine grows
+  out of the middle of a slab.
+- Eighteen hundred trees cannot be eighteen hundred objects, so the forest
+  is not spawned — the models' meshes are read, placed and welded into a
+  handful of batched ones, exactly as the procedural trees were. Three
+  species and three boulders share one texture each, so the whole forest is
+  still one material and one draw call per chunk.
+- A batch either carries its pieces' own texture coordinates or projects
+  them from world space, and it cannot do both: a model arrives unwrapped
+  with its textures baked to that unwrap, and projecting over it throws
+  them away. That is why the snow on the boulders is a second batch rather
+  than a second sub-mesh.
+- The jump is a model standing on a levelled pad, the way a park crew
+  grooms one before they build. Its collider is its own mesh, so what you
+  ride is exactly what you see, and it is pitched to the slope so the
+  approach meets the snow instead of stepping up onto it. The old
+  terrain-following ramp is still there and still builds if the model is
+  missing.
+- The takeoff is a circular arc tangent to the snow, ending at a 42 degree
+  lip. A jump is a shape with a name, and the power curve with a vertical
+  face this started as was not it.
+- The park has a rail now as well as its two boxes. The slab is still the
+  collider and still the thing the game reasons about — where it is, how it
+  is tilted, that it is slick rather than snow — and the tube is hung on it
+  and only ever seen.
+- An FBX carries its own idea of what a unit means, and getting it wrong
+  does not look like an error: the model imports a hundred times too small
+  and simply is not there. Blender writes that field and reads it back the
+  same way, so a round trip through Blender cannot catch it — `check.py`
+  reads the number raw out of the file instead, and `HeroAssets` measures
+  what actually arrived against the size it was drawn at and says so.
+- One material and one mask per model, cached. A lift has dozens of chairs
+  on it, and each one building its own copy of a two-thousand pixel texture
+  is how a scene load turns into a stall.
+- The models are generated, not sculpted. Every one is a Python script in
+  `tools/modelgen` that builds it from primitives at real sizes, so a ski's
+  sidecut is the three numbers a real ski is specified by and changing them
+  is changing the ski. Nothing in this repository is a binary that only one
+  machine can edit.
+- Everything is bevelled, because nothing manufactured has a truly sharp
+  edge — it is cast, pressed, extruded or machined, and every one of those
+  leaves a radius that catches a line of light. It is the cheapest realism
+  in the whole pipeline.
+- Wear is driven off the geometry rather than sprayed over it: how convex a
+  point is says where paint has been knocked off, where zinc has polished
+  and where dirt cannot sit. Ambient occlusion is baked into the base map,
+  because URP has nowhere to put a fourth texture and the contact shading
+  under a seat and around every bolt is most of what stops a model reading
+  as plastic.
 - **The height field is the mountain.** One array of heights; the chunk meshes
   are built from it and each chunk's collider is that same mesh; `SampleHeight`
   is the same bilinear interpolation the triangles perform. So the surface you

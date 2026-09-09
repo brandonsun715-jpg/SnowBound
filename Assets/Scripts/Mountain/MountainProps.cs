@@ -36,10 +36,25 @@ namespace SnowBound.Mountain
         public float maxTreeHeight = 15f;
         public float maxTreeSlopeDeg = 45f;
 
+        [Tooltip("How tightly the forest clumps into stands. A forest scattered\nevenly is a plantation; a real one is stands with clearings between them.")]
+        public float standScale = 0.0055f;
+
+        [Header("Undergrowth")]
+        [Tooltip("Scrub, bushes, fallen trees and stumps. Nothing here collides.")]
+        public int undergrowthCount = 1100;
+
         [Header("Rocks")]
-        public int rockCount = 420;
+        public int rockCount = 900;
         public float minRockSize = 1.5f;
         public float maxRockSize = 5f;
+
+        [Header("Cliffs")]
+        [Tooltip("Bands of bedded rock on the steep ground. A band is several\nslabs laid along the contour, not one boulder made big.")]
+        public int cliffBands = 34;
+        [Tooltip("How steep the ground has to be before the rock breaks through.")]
+        public float minCliffSlopeDeg = 32f;
+        [Tooltip("Width of a slab in the band, in metres.")]
+        public float cliffSize = 7f;
 
         [Header("Piste edge markers")]
         public float markerSpacing = 25f;
@@ -55,6 +70,23 @@ namespace SnowBound.Mountain
             public readonly List<Vector3> verts = new List<Vector3>();
             public readonly List<int> tris = new List<int>();
         }
+
+        /// <summary>
+        /// One placed piece of cliff. Planned before anything is planted, so
+        /// the forest and the boulders can be told to keep off it.
+        /// </summary>
+        class Cliff
+        {
+            public Vector3 position;
+            public Quaternion rotation;
+            public Vector3 scale;
+            public float yaw;
+            public float height;
+            public float reach;
+            public bool tooth;
+        }
+
+        readonly List<Cliff> _cliffs = new List<Cliff>();
 
         void Start() { Build(); }
         void OnDisable() { _ground.Stop(); }
@@ -102,7 +134,11 @@ namespace SnowBound.Mountain
             var container = new GameObject(ContainerName);
             container.transform.SetParent(transform, false);
 
+            // Rock first, everything else around it.
+            PlanCliffs();
+
             SpawnTrees(container.transform);
+            SpawnUndergrowth(container.transform);
             SpawnRocks(container.transform);
             SpawnMarkers(container.transform);
 
@@ -153,19 +189,34 @@ namespace SnowBound.Mountain
 
         void SpawnTrees(Transform parent)
         {
-            Piece trunk, needles, snow;
-            BuildPine(out trunk, out needles, out snow);
+            // Three modelled species if they are in the project, and the
+            // stacked cones this started as if they are not.
+            var wood = new HeroAssets.Piece[3];
+            var caps = new HeroAssets.Piece[3];
+            bool modelled = true;
 
-            Material bark = Surfaces.Bark;
-            Material snowMat = Surfaces.Settled;
+            for (int i = 0; i < 3; i++)
+            {
+                string tag = i == 0 ? "A" : i == 1 ? "B" : "C";
+                wood[i] = HeroAssets.Geometry(HeroAssets.Trees, "Tree" + tag);
+                caps[i] = HeroAssets.Geometry(HeroAssets.Trees, "Snow" + tag);
+                modelled &= wood[i] != null;
+            }
 
-            // Three species rather than three shades of one. Spruce is dark and
-            // blue, fir is warmer, pine is greyer, and a forest of all three
-            // reads as a forest instead of as one tree stamped nine hundred times.
-            var needleShades = new[] { Surfaces.Spruce, Surfaces.Fir, Surfaces.Pine };
+            Material forest = modelled ? HeroAssets.Surface(HeroAssets.Trees) : null;
+            modelled &= forest != null;
 
-            var batch = new MeshBatcher(parent, "Forest",
-                new[] { bark, needleShades[0], needleShades[1], needleShades[2], snowMat });
+            Piece trunk = null, needles = null, snow = null;
+            if (!modelled) BuildPine(out trunk, out needles, out snow);
+
+            // A modelled tree carries its own bark, needles and snow in one
+            // baked texture, so the whole forest is one material. The
+            // fallback needs five: bark, three shades of needle and snow.
+            MeshBatcher batch = modelled
+                ? new MeshBatcher(parent, "Forest", new[] { forest }, 60000, true)
+                : new MeshBatcher(parent, "Forest",
+                    new[] { Surfaces.Bark, Surfaces.Spruce, Surfaces.Fir, Surfaces.Pine,
+                            Surfaces.Settled });
 
             var colliders = new GameObject("TreeColliders");
             colliders.transform.SetParent(parent, false);
@@ -175,6 +226,10 @@ namespace SnowBound.Mountain
             // The line the forest stops at, and the band it thins out over.
             float treeLine = Mathf.Max(20f, mountain.Summit * treeLineShare);
             float fadeFrom = treeLine - Mathf.Max(1f, treeLineFade);
+
+            // A modelled tree is drawn ten metres tall; the old one was drawn
+            // one, and both are scaled to the height this tree wants.
+            float unit = modelled ? 1f / HeroAssets.TreeHeight : 1f;
 
             int placed = 0;
             int guard = 0;
@@ -188,6 +243,7 @@ namespace SnowBound.Mountain
                 float z = Rand(12f, mountain.length - 12f);
 
                 if (mountain.OnAnyTrail(x, z, pisteClearance)) continue;
+                if (NearCliff(x, z, 1.5f)) continue;
 
                 float h = mountain.SampleHeight(x, z);
                 if (h > treeLine) continue;
@@ -199,16 +255,39 @@ namespace SnowBound.Mountain
                 float density = Mathf.InverseLerp(treeLine, fadeFrom, h);
                 if (density < 1f && _rnd.NextDouble() > density * density) continue;
 
-                float height = Rand(minTreeHeight, maxTreeHeight);
+                // And clump. Trees grow where other trees already are, so a
+                // forest is stands with clearings between them rather than an
+                // even scatter — which is the difference between a forest and
+                // a plantation, and it reads from a kilometre away.
+                if (_rnd.NextDouble() > Stand(x, z)) continue;
+
+                // Shorter with altitude: the same species runs out of season
+                // before it runs out of ground.
+                float altitude = Mathf.InverseLerp(0f, Mathf.Max(1f, treeLine), h);
+                float height = Rand(minTreeHeight, maxTreeHeight) * Mathf.Lerp(1.05f, 0.62f, altitude);
                 float girth = Rand(0.82f, 1.2f);
                 var placement = Matrix4x4.TRS(
                     new Vector3(x, h - 0.3f, z),
                     Quaternion.Euler(0f, Rand(0f, 360f), 0f),
-                    new Vector3(height * girth, height, height * girth));
+                    new Vector3(height * girth * unit, height * unit, height * girth * unit));
 
-                batch.Add(trunk.verts, trunk.tris, 0, placement);
-                batch.Add(needles.verts, needles.tris, 1 + _rnd.Next(needleShades.Length), placement);
-                batch.Add(snow.verts, snow.tris, 4, placement);
+                if (modelled)
+                {
+                    int species = _rnd.Next(wood.Length);
+
+                    batch.Add(wood[species].vertices, wood[species].triangles, 0, placement,
+                              wood[species].uvs);
+
+                    if (caps[species] != null)
+                        batch.Add(caps[species].vertices, caps[species].triangles, 0, placement,
+                                  caps[species].uvs);
+                }
+                else
+                {
+                    batch.Add(trunk.verts, trunk.tris, 0, placement);
+                    batch.Add(needles.verts, needles.tris, 1 + _rnd.Next(3), placement);
+                    batch.Add(snow.verts, snow.tris, 4, placement);
+                }
 
                 var hit = new GameObject("TreeCollider");
                 hit.transform.SetParent(colliders.transform, false);
@@ -226,26 +305,159 @@ namespace SnowBound.Mountain
             batch.Flush();
         }
 
+        /// <summary>
+        /// How much forest belongs at a point, ignoring altitude: two
+        /// octaves of noise, one for the stands and one for the gaps inside
+        /// them.
+        /// </summary>
+        float Stand(float x, float z)
+        {
+            float stand = Mathf.PerlinNoise((x + 500f) * standScale, (z + 900f) * standScale);
+            float gaps = Mathf.PerlinNoise((x - 200f) * standScale * 3.1f,
+                                           (z + 300f) * standScale * 3.1f);
+
+            return Mathf.Clamp01(stand * 1.35f - 0.20f + (gaps - 0.5f) * 0.30f);
+        }
+
+        // ---------------- undergrowth -------------------------------------
+
+        /// <summary>
+        /// What grows between the trees: scrub at the tree line, bare bushes
+        /// in the clearings, and blown-down trunks and stumps inside the
+        /// stands where they fell.
+        ///
+        /// None of it collides. It is there to break up the ground between
+        /// the trees, which is the difference between a forest and a set of
+        /// trees standing on a white plane.
+        /// </summary>
+        void SpawnUndergrowth(Transform parent)
+        {
+            var scrub = HeroAssets.Geometry(HeroAssets.Flora, "ShrubA");
+            var scrubSnow = HeroAssets.Geometry(HeroAssets.Flora, "SnowShrubA");
+            var bush = HeroAssets.Geometry(HeroAssets.Flora, "ShrubB");
+            var fallen = HeroAssets.Geometry(HeroAssets.Flora, "Fallen");
+            var fallenSnow = HeroAssets.Geometry(HeroAssets.Flora, "SnowFallen");
+            var stump = HeroAssets.Geometry(HeroAssets.Flora, "Stump");
+
+            Material flora = HeroAssets.Surface(HeroAssets.Flora);
+            if (scrub == null || bush == null || fallen == null || stump == null || flora == null)
+                return;
+
+            var batch = new MeshBatcher(parent, "Undergrowth", new[] { flora }, 60000, true);
+
+            float halfW = mountain.width * 0.5f;
+            float treeLine = Mathf.Max(20f, mountain.Summit * treeLineShare);
+
+            int guard = 0;
+            int placed = 0;
+            int guardLimit = Mathf.Max(1000, undergrowthCount * 30);
+
+            while (placed < undergrowthCount && guard < guardLimit)
+            {
+                guard++;
+
+                float x = Rand(-halfW + 10f, halfW - 10f);
+                float z = Rand(10f, mountain.length - 10f);
+
+                if (mountain.OnAnyTrail(x, z, pisteClearance * 0.6f)) continue;
+                if (NearCliff(x, z, 0.5f)) continue;
+
+                float h = mountain.SampleHeight(x, z);
+                float slope = Vector3.Angle(mountain.SampleNormal(x, z), Vector3.up);
+                if (slope > 42f) continue;
+
+                float altitude = h / Mathf.Max(1f, treeLine);
+                float stand = Stand(x, z);
+
+                HeroAssets.Piece piece;
+                HeroAssets.Piece snow = null;
+                float size;
+
+                if (altitude > 0.86f)
+                {
+                    // Above the trees: scrub, and only where it is sheltered.
+                    if (altitude > 1.35f || _rnd.NextDouble() > 0.55) continue;
+                    piece = scrub;
+                    snow = scrubSnow;
+                    size = Rand(0.7f, 1.3f);
+                }
+                else if (stand > 0.62f)
+                {
+                    // Inside a stand: what fell, and what was cut.
+                    bool log = _rnd.NextDouble() < 0.45;
+                    piece = log ? fallen : stump;
+                    snow = log ? fallenSnow : null;
+                    size = Rand(0.8f, 1.25f);
+                }
+                else if (stand > 0.18f)
+                {
+                    piece = _rnd.NextDouble() < 0.65 ? bush : scrub;
+                    snow = piece == scrub ? scrubSnow : null;
+                    size = Rand(0.8f, 1.4f);
+                }
+                else
+                {
+                    continue;
+                }
+
+                var placement = Matrix4x4.TRS(
+                    new Vector3(x, h - 0.06f, z),
+                    Quaternion.Euler(Rand(-5f, 5f), Rand(0f, 360f), Rand(-5f, 5f)),
+                    new Vector3(size, size * Rand(0.85f, 1.15f), size));
+
+                batch.Add(piece.vertices, piece.triangles, 0, placement, piece.uvs);
+                if (snow != null)
+                    batch.Add(snow.vertices, snow.triangles, 0, placement, snow.uvs);
+
+                placed++;
+            }
+
+            batch.Flush();
+        }
+
         // ---------------- rocks ------------------------------------------
 
         void SpawnRocks(Transform parent)
         {
+            // Three modelled boulders if they are there, and Unity's sphere
+            // if they are not.
+            var stone = new HeroAssets.Piece[3];
+            bool modelled = true;
+
+            for (int i = 0; i < 3; i++)
+            {
+                stone[i] = HeroAssets.Geometry(HeroAssets.Rocks,
+                                               "Rock" + (i == 0 ? "A" : i == 1 ? "B" : "C"));
+                modelled &= stone[i] != null;
+            }
+
+            Material granite = modelled ? HeroAssets.Surface(HeroAssets.Rocks) : null;
+            modelled &= granite != null;
+
             Mesh sphere = BorrowPrimitiveMesh(PrimitiveType.Sphere);
-            if (sphere == null) return;
+            if (sphere == null && !modelled) return;
 
             var boulder = new Piece();
-            boulder.verts.AddRange(sphere.vertices);
-            boulder.tris.AddRange(sphere.triangles);
+            if (sphere != null)
+            {
+                boulder.verts.AddRange(sphere.vertices);
+                boulder.tris.AddRange(sphere.triangles);
+            }
 
-            Material rockMat = Surfaces.Rock;
-            Material capMat = Surfaces.Settled;
+            // Two batches, not two sub-meshes: the rock brought its own
+            // texture coordinates and the snow on top of it has none, and
+            // one mesh cannot be unwrapped and projected at the same time.
+            var rocks = modelled
+                ? new MeshBatcher(parent, "Rocks", new[] { granite }, 60000, true)
+                : new MeshBatcher(parent, "Rocks", new[] { Surfaces.Rock });
 
-            var batch = new MeshBatcher(parent, "Rocks", new[] { rockMat, capMat });
+            var settled = new MeshBatcher(parent, "RockSnow", new[] { Surfaces.Settled });
 
             var colliders = new GameObject("RockColliders");
             colliders.transform.SetParent(parent, false);
 
             float halfW = mountain.width * 0.5f;
+            float unit = modelled ? 1f / HeroAssets.RockSize : 1f;
 
             for (int i = 0; i < rockCount; i++)
             {
@@ -255,21 +467,57 @@ namespace SnowBound.Mountain
                 // Strictly off-piste: keeps the run clean and keeps rocks out
                 // of the base area where the lodge stands.
                 if (mountain.OnAnyTrail(x, z, 2f)) continue;
+                if (NearCliff(x, z, 1f)) continue;
 
-                float sx = Rand(minRockSize, maxRockSize);
+                float h = mountain.SampleHeight(x, z);
+
+                // Rock shows through where the mountain is steep, high, or
+                // has been scoured — not evenly over the whole map. Boulders
+                // sit low where they rolled to; scree lies high where it
+                // broke off.
+                float slope = Vector3.Angle(mountain.SampleNormal(x, z), Vector3.up);
+                float altitude = Mathf.InverseLerp(0f, Mathf.Max(1f, mountain.Summit), h);
+                float field = Mathf.PerlinNoise((x + 1300f) * 0.0075f, (z - 700f) * 0.0075f);
+
+                float chance = Mathf.Clamp01(field * 1.5f - 0.35f)
+                             + Mathf.InverseLerp(24f, 46f, slope) * 0.55f
+                             + altitude * 0.45f;
+
+                if (_rnd.NextDouble() > chance) continue;
+
+                // Big at the bottom, scree at the top.
+                float scale = Mathf.Lerp(1.0f, 0.34f, altitude) * Rand(0.7f, 1.25f);
+                float sx = Mathf.Clamp(maxRockSize * scale, minRockSize * 0.4f, maxRockSize);
                 float sy = sx * Rand(0.5f, 0.9f);
                 float sz = sx * Rand(0.7f, 1.3f);
 
-                Vector3 position = new Vector3(x, mountain.SampleHeight(x, z) - sy * 0.28f, z);
+                Vector3 position = new Vector3(x, h - sy * 0.28f, z);
                 Quaternion tilt = Quaternion.Euler(Rand(-25f, 25f), Rand(0f, 360f), Rand(-25f, 25f));
-                var placement = Matrix4x4.TRS(position, tilt, new Vector3(sx, sy, sz));
+                var placement = Matrix4x4.TRS(position, tilt,
+                                              new Vector3(sx * unit, sy * unit, sz * unit));
 
-                batch.Add(boulder.verts, boulder.tris, 0, placement);
+                HeroAssets.Piece rock = modelled ? stone[_rnd.Next(stone.Length)] : null;
 
-                // Snow settles on top, level, however the boulder is tipped.
+                if (rock != null) rocks.Add(rock.vertices, rock.triangles, 0, placement, rock.uvs);
+                else rocks.Add(boulder.verts, boulder.tris, 0, placement);
+
+                // Snow settles on top, level, however the boulder is tipped —
+                // and it is the same shape as the rock under it, so it sits on
+                // the facets instead of bulging off them.
                 var cap = Matrix4x4.TRS(position + Vector3.up * sy * 0.22f, Quaternion.identity,
                                         new Vector3(sx * 0.88f, sy * 0.55f, sz * 0.88f));
-                batch.Add(boulder.verts, boulder.tris, 1, cap);
+
+                if (rock != null)
+                {
+                    var capped = Matrix4x4.TRS(position + Vector3.up * sy * 0.22f, Quaternion.identity,
+                                               new Vector3(sx * 0.88f * unit, sy * 0.55f * unit,
+                                                           sz * 0.88f * unit));
+                    settled.Add(rock.vertices, rock.triangles, 0, capped);
+                }
+                else if (boulder.verts.Count > 0)
+                {
+                    settled.Add(boulder.verts, boulder.tris, 0, cap);
+                }
 
                 var hit = new GameObject("RockCollider");
                 hit.transform.SetParent(colliders.transform, false);
@@ -281,7 +529,210 @@ namespace SnowBound.Mountain
                 collider.convex = true;
             }
 
-            batch.Flush();
+            SpawnCliffs(rocks, settled, colliders.transform, unit, modelled);
+
+            rocks.Flush();
+            settled.Flush();
+        }
+
+        // ---------------- cliffs -----------------------------------------
+
+        /// <summary>
+        /// Bands of bedded rock on the steep ground.
+        ///
+        /// A cliff is not a big boulder. What reads as a cliff is a line of
+        /// flat-topped slabs following one contour — the bed that broke —
+        /// with the odd tooth left standing above it, all of it half buried
+        /// so the rock comes out of the mountain instead of sitting on it.
+        ///
+        /// It shares the boulders' batches, so a whole map of cliffs is not
+        /// one extra draw call.
+        /// </summary>
+        void PlanCliffs()
+        {
+            _cliffs.Clear();
+            if (cliffBands <= 0) return;
+
+            HeroAssets.Piece slab = HeroAssets.Geometry(HeroAssets.Rocks, "RockSlab");
+            HeroAssets.Piece spire = HeroAssets.Geometry(HeroAssets.Rocks, "RockSpire");
+            if (slab == null || spire == null) return;
+
+            float halfW = mountain.width * 0.5f;
+
+            // The same one number the boulders use: the set was drawn two
+            // metres across, so a metre of world is half of it.
+            float unit = 1f / HeroAssets.RockSize;
+
+            for (int band = 0; band < cliffBands; band++)
+            {
+                // Find somewhere steep. Give up on a band rather than settle
+                // for flat ground: a cliff in a meadow is worse than no cliff.
+                float x = 0f, z = 0f;
+                Vector3 normal = Vector3.up;
+                bool found = false;
+
+                for (int attempt = 0; attempt < 40 && !found; attempt++)
+                {
+                    x = Rand(-halfW + 20f, halfW - 20f);
+                    z = Rand(30f, mountain.length - 30f);
+
+                    if (mountain.OnAnyTrail(x, z, cliffSize)) continue;
+
+                    normal = mountain.SampleNormal(x, z);
+                    found = Vector3.Angle(normal, Vector3.up) >= minCliffSlopeDeg;
+                }
+
+                if (!found) continue;
+
+                // Along the contour, not down the fall line. Rock breaks along
+                // the bed, and the bed is level.
+                Vector3 fall = Vector3.ProjectOnPlane(-normal, Vector3.up);
+                if (fall.sqrMagnitude < 0.0001f) continue;
+
+                Vector3 contour = Vector3.Cross(Vector3.up, fall.normalized).normalized;
+
+                int pieces = _rnd.Next(3, 7);
+                float step = cliffSize * Rand(0.62f, 0.82f);
+                float start = -(pieces - 1) * 0.5f * step;
+
+                for (int i = 0; i < pieces; i++)
+                {
+                    float along = start + i * step;
+
+                    // The band wanders off its line a little, so it is a band
+                    // and not a wall.
+                    Vector3 drift = fall.normalized * Rand(-cliffSize * 0.35f, cliffSize * 0.35f);
+                    float px = x + contour.x * along + drift.x;
+                    float pz = z + contour.z * along + drift.z;
+
+                    // Wider than it looks: the run's fencing stands a couple
+                    // of metres out from the edge, and a slab through a fence
+                    // panel is worse than a gap in the band.
+                    if (mountain.OnAnyTrail(px, pz, 6f)) continue;
+
+                    Vector3 groundNormal = mountain.SampleNormal(px, pz);
+                    if (Vector3.Angle(groundNormal, Vector3.up) < minCliffSlopeDeg * 0.7f) continue;
+
+                    float h = mountain.SampleHeight(px, pz);
+                    bool tooth = _rnd.NextDouble() < 0.22;
+
+                    HeroAssets.Piece piece = tooth ? spire : slab;
+
+                    float size = cliffSize * Rand(0.72f, 1.30f) * (tooth ? 0.65f : 1f);
+                    var scale = new Vector3(size * Rand(0.9f, 1.15f), size * Rand(0.85f, 1.2f),
+                                            size * Rand(0.9f, 1.15f));
+
+                    // Bedded into the slope: the slab lies with the hill, and
+                    // most of its depth is under the surface.
+                    Quaternion bed = Quaternion.Slerp(Quaternion.identity,
+                                                      Quaternion.FromToRotation(Vector3.up, groundNormal),
+                                                      Rand(0.55f, 0.95f));
+
+                    float yaw = Mathf.Atan2(-contour.z, contour.x) * Mathf.Rad2Deg + Rand(-16f, 16f);
+                    Quaternion rotation = bed * Quaternion.Euler(Rand(-8f, 8f), yaw, Rand(-8f, 8f));
+
+                    // Half buried, measured off the model rather than guessed:
+                    // a slab is sunk most of its thickness, a tooth only its
+                    // foot, because a tooth is what is left standing.
+                    Vector3 extent = LocalSize(piece);
+                    float height = extent.y * scale.y * unit;
+                    float sink = height * (tooth ? Rand(0.16f, 0.28f) : Rand(0.30f, 0.52f));
+                    var position = new Vector3(px, h - sink, pz);
+
+                    _cliffs.Add(new Cliff
+                    {
+                        position = position,
+                        rotation = rotation,
+                        scale = scale,
+                        yaw = yaw,
+                        height = height,
+                        tooth = tooth,
+                        reach = Mathf.Max(extent.x * scale.x, extent.z * scale.z) * unit * 0.5f,
+                    });
+                }
+            }
+        }
+
+        /// <summary>Write the planned cliffs into the boulders' batches.</summary>
+        void SpawnCliffs(MeshBatcher rocks, MeshBatcher settled, Transform colliders,
+                         float unit, bool modelled)
+        {
+            if (!modelled || _cliffs.Count == 0) return;
+
+            HeroAssets.Piece slab = HeroAssets.Geometry(HeroAssets.Rocks, "RockSlab");
+            HeroAssets.Piece spire = HeroAssets.Geometry(HeroAssets.Rocks, "RockSpire");
+            if (slab == null || spire == null) return;
+
+            Mesh slabHull = HeroAssets.Shape(HeroAssets.Rocks, "RockSlab");
+            Mesh spireHull = HeroAssets.Shape(HeroAssets.Rocks, "RockSpire");
+
+            foreach (Cliff cliff in _cliffs)
+            {
+                HeroAssets.Piece piece = cliff.tooth ? spire : slab;
+                Mesh hull = cliff.tooth ? spireHull : slabHull;
+
+                var placement = Matrix4x4.TRS(cliff.position, cliff.rotation, cliff.scale * unit);
+                rocks.Add(piece.vertices, piece.triangles, 0, placement, piece.uvs);
+
+                // Snow lies on the top of a slab, level, but only on the ones
+                // that are lying down — nothing settles on a tooth.
+                if (!cliff.tooth && Vector3.Angle(cliff.rotation * Vector3.up, Vector3.up) < 34f)
+                {
+                    var capped = Matrix4x4.TRS(cliff.position + Vector3.up * cliff.height * 0.26f,
+                                               Quaternion.Euler(0f, cliff.yaw, 0f),
+                                               new Vector3(cliff.scale.x * 0.9f, cliff.scale.y * 0.55f,
+                                                           cliff.scale.z * 0.9f) * unit);
+                    settled.Add(piece.vertices, piece.triangles, 0, capped);
+                }
+
+                if (hull == null) continue;
+
+                var hit = new GameObject(cliff.tooth ? "CliffTooth" : "CliffSlab");
+                hit.transform.SetParent(colliders, false);
+                hit.transform.SetPositionAndRotation(cliff.position, cliff.rotation);
+                hit.transform.localScale = cliff.scale * unit;
+
+                var collider = hit.AddComponent<MeshCollider>();
+                collider.sharedMesh = hull;
+                collider.convex = true;
+            }
+        }
+
+        /// <summary>
+        /// True where a cliff already is. Nothing else is planted there: a
+        /// pine growing out of the middle of a slab is the single loudest way
+        /// to say none of this was placed by anybody.
+        /// </summary>
+        bool NearCliff(float x, float z, float clearance)
+        {
+            for (int i = 0; i < _cliffs.Count; i++)
+            {
+                Cliff cliff = _cliffs[i];
+                float dx = x - cliff.position.x;
+                float dz = z - cliff.position.z;
+                float reach = cliff.reach + clearance;
+
+                if (dx * dx + dz * dz < reach * reach) return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>How big one piece of geometry is in its own space.</summary>
+        static Vector3 LocalSize(HeroAssets.Piece piece)
+        {
+            var low = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
+            var high = new Vector3(float.MinValue, float.MinValue, float.MinValue);
+
+            for (int i = 0; i < piece.vertices.Count; i++)
+            {
+                low = Vector3.Min(low, piece.vertices[i]);
+                high = Vector3.Max(high, piece.vertices[i]);
+            }
+
+            Vector3 size = high - low;
+
+            return size.x > 0f ? size : Vector3.one;
         }
 
         /// <summary>

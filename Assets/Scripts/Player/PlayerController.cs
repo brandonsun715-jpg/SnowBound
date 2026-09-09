@@ -158,6 +158,13 @@ namespace SnowBound.Player
 
             StepBody((Velocity + GroundStick) * dt);
             GroundStick = Vector3.zero;
+
+            // The rider is told how the ride is going and stands accordingly:
+            // leaning into the turn, folded up over the speed, tucked in the
+            // air. It reads what is happening rather than what was pressed,
+            // exactly as the spray and the audio do.
+            if (_visual != null)
+                _visual.SetRide(Speed, LateralSlip, IsGrounded, IsRidingSnow);
         }
 
         /// <summary>

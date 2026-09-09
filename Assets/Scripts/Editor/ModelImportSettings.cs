@@ -72,7 +72,13 @@ namespace SnowBound.EditorTools
             importer.importAnimation = false;
             importer.importBlendShapes = false;
 
-            importer.isReadable = false;
+            // Most of these are read on the CPU: the forest and the rocks are
+            // welded into batched meshes, and a guest is one mesh combined
+            // from a rider's fifteen parts. Only the lodge is left unreadable,
+            // because it is the one model big enough for a second copy of it
+            // in memory to matter.
+            string file = System.IO.Path.GetFileNameWithoutExtension(assetPath);
+            importer.isReadable = file != "Lodge";
             importer.meshCompression = ModelImporterMeshCompression.Medium;
             importer.optimizeMeshPolygons = true;
             importer.optimizeMeshVertices = true;

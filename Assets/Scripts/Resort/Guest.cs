@@ -46,6 +46,17 @@ namespace SnowBound.Resort
         public float walkSpeed = 2.4f;
         public float turnSpeed = 420f;
 
+        [Header("Riding")]
+        [Tooltip("Degrees of lean per degree a second of turn. A guest coming down\nbolt upright is the thing that gives a crowd away as scenery.")]
+        public float leanPerTurn = 0.34f;
+        public float maxLean = 24f;
+        [Tooltip("How much of the slope a guest takes. A guest is one welded mesh\nand cannot bend, so standing them straight up on a thirty degree pitch\nburies the ski tips and lifts the tails clear of the snow. Most of the\nway over puts the skis on the snow without laying the guest back.")]
+        [Range(0f, 1f)] public float slopeBed = 0.8f;
+
+        float _roll;
+        Vector3 _heading;
+        bool _hasHeading;
+
         public int RunsCompleted { get; private set; }
 
         GuestDirector _director;
@@ -153,7 +164,7 @@ namespace SnowBound.Resort
                 return;
             }
 
-            Advance(flat.normalized, walkSpeed, dt);
+            Advance(flat.normalized, walkSpeed, dt, false);
         }
 
         void Arrived(Activity next)
@@ -201,7 +212,7 @@ namespace SnowBound.Resort
             // Shuffle towards the loading point rather than standing rigid.
             Vector3 flat = LiftPoint() - transform.position;
             flat.y = 0f;
-            if (flat.magnitude > 1.2f) Advance(flat.normalized, walkSpeed * 0.4f, dt);
+            if (flat.magnitude > 1.2f) Advance(flat.normalized, walkSpeed * 0.4f, dt, false);
             else Settle();
         }
 
@@ -264,16 +275,51 @@ namespace SnowBound.Resort
             // Loose snow is slower than a groomed run, and the better skiers
             // get more out of both.
             float speed = Mathf.Lerp(7f, 17f, ability) / Mathf.Max(0.6f, run.Drag);
-            Advance(flat.normalized, speed, dt);
+            Advance(flat.normalized, speed, dt, true);
         }
 
-        void Advance(Vector3 direction, float speed, float dt)
+        void Advance(Vector3 direction, float speed, float dt, bool riding)
         {
             Vector3 next = transform.position + direction * speed * dt;
             next.y = _mountain != null ? _mountain.SampleHeight(next.x, next.z) : next.y;
             transform.position = next;
 
             Quaternion want = Quaternion.LookRotation(direction, Vector3.up);
+
+            if (riding)
+            {
+                // Lean into the turn. The rate comes from how fast the line
+                // itself is bending, not from how far the guest has fallen
+                // behind it: the second is mostly the frame rate. Turning
+                // right rolls them right, which is the way round that puts
+                // the lean inside the turn.
+                float turning = _hasHeading
+                    ? Vector3.SignedAngle(_heading, direction, Vector3.up) / Mathf.Max(0.0001f, dt)
+                    : 0f;
+
+                _heading = direction;
+                _hasHeading = true;
+
+                float lean = Mathf.Clamp(turning * leanPerTurn, -maxLean, maxLean);
+
+                _roll = Mathf.Lerp(_roll, lean, 1f - Mathf.Exp(-4f * dt));
+
+                if (_mountain != null && slopeBed > 0f)
+                {
+                    Quaternion bed = Quaternion.FromToRotation(
+                        Vector3.up, _mountain.SampleNormal(next.x, next.z));
+                    want = Quaternion.Slerp(Quaternion.identity, bed, slopeBed) * want;
+                }
+
+                want = want * Quaternion.Euler(0f, 0f, _roll);
+            }
+            else if (_roll != 0f)
+            {
+                _hasHeading = false;
+                _roll = Mathf.Lerp(_roll, 0f, 1f - Mathf.Exp(-6f * dt));
+                want = want * Quaternion.Euler(0f, 0f, _roll);
+            }
+
             transform.rotation = Quaternion.RotateTowards(transform.rotation, want, turnSpeed * dt);
         }
 
