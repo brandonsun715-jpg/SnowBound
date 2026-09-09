@@ -223,6 +223,11 @@ namespace SnowBound.EditorTools
             if (Object.FindAnyObjectByType<SnowBound.Core.QualityDirector>() == null)
                 go.AddComponent<SnowBound.Core.QualityDirector>();
 
+            // Benches, bins, lamps, run signs and fencing. It reads the lodge
+            // and the runs, so it goes on the mountain with everything else.
+            if (Object.FindAnyObjectByType<SnowBound.Resort.ResortDressing>() == null)
+                go.AddComponent<SnowBound.Resort.ResortDressing>();
+
             // The park exists as a component but is not raised: a new resort
             // has one lodge and a bare mountain, and everything else is the
             // player's decision.

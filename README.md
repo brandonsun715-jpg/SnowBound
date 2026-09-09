@@ -156,7 +156,11 @@ are on screen for the whole run. Both were boxes.
    crossarm and footing, the chair's back and bar. *(done)*
 10. **One dial for how much machine it uses** — Low to Ultra, scaling what
     is planted, how far you see, and how far shadows are cast. *(done)*
-11. **A model generator** — every one of them is a script in this repo
+11. **A rider who rides** — leans into the turn, folds up over the speed,
+    tucks in the air, off what the body is actually doing. *(done)*
+12. **A resort with things in it** — benches, bins, lamps, run signs, safety
+    fencing where the ground falls away, and pushed snow. *(done)*
+13. **A model generator** — every one of them is a script in this repo
     rather than a binary nobody can edit. *(done)*
 
 ## Making a model
@@ -466,6 +470,16 @@ was created with; picking the wrong one leaves every button silently dead.
   the game still runs, on boxes, and still sits down properly.
 - Poles hang off the hands that hold them rather than floating beside the
   rider, and the skis and the board follow the feet onto the chairlift.
+- The rider stands the way the ride is going: leaning into the turn, folded
+  over the speed, tucked in the air. All three come off what the body is
+  doing — its speed and its sideways slip — rather than off the keyboard,
+  the same rule the spray and the audio follow, so a rider washing out
+  sideways leans whether or not anybody is holding a key down.
+- Nothing in the base area is scattered. A bench faces the lodge because
+  that is where you sit and look, a bin stands beside a bench, and a fence
+  goes where the ground beyond the edge of the run actually drops away —
+  measured by sampling it, so fences end up along the cliff side of a
+  traverse and nowhere along an open bowl.
 - A guest is not a rig. The player is fifteen parts because the game bends
   their knees onto a chairlift; a guest is only ever moved, so a guest is
   the same rider welded into one mesh — which is fewer renderers than the

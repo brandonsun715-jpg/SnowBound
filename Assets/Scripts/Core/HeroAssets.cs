@@ -52,6 +52,7 @@ namespace SnowBound.Core
         public const string Trees = "Trees";
         public const string Rocks = "Rocks";
         public const string Flora = "Flora";
+        public const string Props = "ResortProps";
         public const string Park = "ParkFeatures";
 
         /// <summary>

@@ -29,6 +29,7 @@ MODELS = {
     "park": ("park", dict(angle=36, elevation=14, distance=2.8)),
     "rocks": ("rocks", dict(angle=34, elevation=16, distance=2.8)),
     "flora": ("flora", dict(angle=34, elevation=14, distance=2.8)),
+    "props": ("props", dict(angle=36, elevation=16, distance=2.8)),
     "skier": ("skier", dict(angle=30, elevation=8, distance=3.2)),
     "boarder": ("boarder", dict(angle=34, elevation=8, distance=3.2)),
     "ski": ("ski", dict(angle=28, elevation=26)),

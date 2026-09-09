@@ -38,6 +38,17 @@ namespace SnowBound.Player
         [Tooltip("Metres either side of the middle for a skier's feet.")]
         public float trackWidth = 0.14f;
 
+        [Header("Riding")]
+        [Tooltip("Degrees of lean per metre a second of sideways slip. A rider\nleans into a turn against the force throwing them out of it.")]
+        public float leanPerSlip = 2.4f;
+        public float maxLean = 28f;
+        [Tooltip("Speed at which the rider is fully folded up over their skis.")]
+        public float fastSpeed = 22f;
+        [Tooltip("Metres the hips drop at full speed.")]
+        public float crouchDepth = 0.16f;
+        [Tooltip("How quickly the stance follows the ride. Lower is heavier.")]
+        public float stanceResponse = 7f;
+
         Rider _skier;
         Rider _boarder;
         Rider _plain;
@@ -52,6 +63,10 @@ namespace SnowBound.Player
         LocomotionKind _shownGear = LocomotionKind.Walk;
         float _bodyYaw;
         bool _seated;
+
+        float _lean;
+        float _crouch;
+        float _tuck;
 
         void Start() { Build(); }
 
@@ -176,6 +191,47 @@ namespace SnowBound.Player
                 gear.localPosition = seated ? new Vector3(0f, -0.28f, 0.30f) : Vector3.zero;
                 gear.localRotation = seated ? Quaternion.Euler(-16f, 0f, 0f) : Quaternion.identity;
             }
+        }
+
+        /// <summary>
+        /// Stand the rider the way the ride is actually going.
+        ///
+        /// Everything here is read off what the body is doing rather than
+        /// off the keyboard — the same rule the spray and the audio follow —
+        /// so a rider washing out sideways leans and folds whether or not
+        /// anybody is holding a key down.
+        ///
+        /// Three numbers do all of it. Lean is the sideways slip: a rider
+        /// leans into a turn against the force throwing them out of it, and
+        /// that lean is the single thing that makes riding read as riding.
+        /// Crouch is speed: fast is low. Tuck is being in the air, where the
+        /// legs come up.
+        /// </summary>
+        public void SetRide(float speed, float slip, bool grounded, bool onSnow)
+        {
+            // Sitting on a chairlift is a pose of its own and outranks this
+            // one. The controller does not call here while riding, but a
+            // rider frozen half in a chair is not worth the risk.
+            if (!Application.isPlaying || _shown == null || _seated) return;
+
+            float lean = 0f;
+            float crouch = 0f;
+            float tuck = 0f;
+
+            if (onSnow && !_seated)
+            {
+                lean = Mathf.Clamp(-slip * leanPerSlip, -maxLean, maxLean);
+                crouch = Mathf.Clamp01(speed / Mathf.Max(1f, fastSpeed));
+                tuck = grounded ? 0f : 1f;
+            }
+
+            float k = 1f - Mathf.Exp(-Mathf.Max(0.1f, stanceResponse) * Time.deltaTime);
+
+            _lean = Mathf.Lerp(_lean, lean, k);
+            _crouch = Mathf.Lerp(_crouch, crouch, k);
+            _tuck = Mathf.Lerp(_tuck, tuck, k);
+
+            _shown.Ride(_lean, _crouch * crouchDepth, _crouch, _tuck);
         }
 
         /// <summary>
@@ -395,9 +451,37 @@ namespace SnowBound.Player
                 if (root != null) root.gameObject.SetActive(on);
             }
 
+            float _yaw;
+
             public void Yaw(float degrees)
             {
+                _yaw = degrees;
                 if (torso != null) torso.localRotation = Quaternion.Euler(0f, degrees, 0f);
+            }
+
+            /// <summary>
+            /// Lean, fold and tuck. The torso keeps whatever yaw the gear
+            /// asked for and rolls on top of it, so a snowboarder's shoulders
+            /// stay across the board while they lean into a turn.
+            /// </summary>
+            public void Ride(float lean, float drop, float fold, float tuck)
+            {
+                if (torso != null)
+                    torso.localRotation = Quaternion.Euler(fold * 9f, _yaw, lean);
+
+                if (hips != null)
+                    hips.localPosition = _hipsHome - new Vector3(0f, drop, 0f);
+
+                float knee = fold * 16f + tuck * 26f;
+
+                for (int i = 0; i < 2; i++)
+                {
+                    if (thighs[i] != null)
+                        thighs[i].localRotation = Quaternion.Euler(-knee, 0f, lean * 0.25f);
+
+                    if (shins[i] != null)
+                        shins[i].localRotation = Quaternion.Euler(knee * 1.35f, 0f, 0f);
+                }
             }
 
             /// <summary>
@@ -410,6 +494,8 @@ namespace SnowBound.Player
             /// </summary>
             public void Seat(bool seated)
             {
+                // Sitting down overrides the riding stance, and standing back
+                // up hands it back.
                 if (hips != null)
                     hips.localPosition = seated
                         ? _hipsHome + new Vector3(0f, -0.30f, 0.04f)
