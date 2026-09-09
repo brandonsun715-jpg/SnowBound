@@ -25,7 +25,7 @@ namespace SnowBound.Buildings
 
         [Header("Placement (world metres)")]
         public float positionX = -34f;
-        public float positionZ = 30f;
+        public float positionZ = 62f;
         [Tooltip("Degrees around Y. Turns the front of the lodge towards the ski run.")]
         public float facingYaw = 70f;
 

@@ -76,8 +76,8 @@ namespace SnowBound.EditorTools
 
             asset.renderScale = 1f;
             asset.msaaSampleCount = 4;
-            asset.shadowDistance = 260f;
-            asset.shadowCascadeCount = 3;
+            asset.shadowDistance = 380f;
+            asset.shadowCascadeCount = 4;
 
             QualitySettings.antiAliasing = 4;
             QualitySettings.vSyncCount = 1;
@@ -144,8 +144,13 @@ namespace SnowBound.EditorTools
             cam.transform.position = new Vector3(0f, 28f, -75f);
             cam.transform.rotation = Quaternion.Euler(8f, 0f, 0f);
             cam.clearFlags = CameraClearFlags.Skybox;
-            cam.farClipPlane = 6000f;
-            cam.nearClipPlane = 0.1f;
+            // Far enough to see the horizon range, which stands eleven
+            // kilometres out at the corners. The near plane is pushed back to
+            // pay for it: the camera is third person or flying, so nothing is
+            // ever within thirty centimetres of it, and the depth buffer is
+            // better spent on the other sixteen kilometres.
+            cam.farClipPlane = 16000f;
+            cam.nearClipPlane = 0.3f;
 
             // Multisampling handles the geometry; SMAA cleans up the rest of
             // the crawling edges, which is most of what reads as pixelation on

@@ -52,8 +52,8 @@ namespace SnowBound.Weather
         public float ambientStrength = 1.15f;
 
         [Header("Air")]
-        public float clearFogDensity = 0.00055f;
-        public float stormFogDensity = 0.0070f;
+        public float clearFogDensity = 0.00016f;
+        public float stormFogDensity = 0.0042f;
         [Tooltip("Extra haze low down, which is where the air actually is.")]
         public float valleyHaze = 1.35f;
 

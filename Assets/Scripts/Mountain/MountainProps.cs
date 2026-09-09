@@ -25,9 +25,11 @@ namespace SnowBound.Mountain
         public MountainGenerator mountain;
 
         [Header("Pine trees")]
-        public int treeCount = 900;
-        [Tooltip("No trees are placed above this height (metres).")]
-        public float treeLine = 168f;
+        public int treeCount = 1800;
+        [Tooltip("Tree line as a share of the summit. Read off the mountain rather\nthan typed in, so moving a peak moves the forest with it.")]
+        [Range(0.2f, 1f)] public float treeLineShare = 0.60f;
+        [Tooltip("Metres of thinning below the line. A forest that stops dead along\na contour is the giveaway that nobody planted it.")]
+        public float treeLineFade = 60f;
         [Tooltip("Keep trees this far away from the edge of a run.")]
         public float pisteClearance = 8f;
         public float minTreeHeight = 6f;
@@ -35,7 +37,7 @@ namespace SnowBound.Mountain
         public float maxTreeSlopeDeg = 45f;
 
         [Header("Rocks")]
-        public int rockCount = 210;
+        public int rockCount = 420;
         public float minRockSize = 1.5f;
         public float maxRockSize = 5f;
 
@@ -169,6 +171,11 @@ namespace SnowBound.Mountain
             colliders.transform.SetParent(parent, false);
 
             float halfW = mountain.width * 0.5f;
+
+            // The line the forest stops at, and the band it thins out over.
+            float treeLine = Mathf.Max(20f, mountain.Summit * treeLineShare);
+            float fadeFrom = treeLine - Mathf.Max(1f, treeLineFade);
+
             int placed = 0;
             int guard = 0;
             int guardLimit = Mathf.Max(1000, treeCount * 40);
@@ -185,6 +192,12 @@ namespace SnowBound.Mountain
                 float h = mountain.SampleHeight(x, z);
                 if (h > treeLine) continue;
                 if (Vector3.Angle(mountain.SampleNormal(x, z), Vector3.up) > maxTreeSlopeDeg) continue;
+
+                // Thin out towards the tree line. Squared, because a real one
+                // goes from forest to scattered survivors quickly and then
+                // takes a while to give up altogether.
+                float density = Mathf.InverseLerp(treeLine, fadeFrom, h);
+                if (density < 1f && _rnd.NextDouble() > density * density) continue;
 
                 float height = Rand(minTreeHeight, maxTreeHeight);
                 float girth = Rand(0.82f, 1.2f);

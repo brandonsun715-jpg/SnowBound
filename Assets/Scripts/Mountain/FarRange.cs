@@ -6,48 +6,72 @@ using SnowBound.Core;
 namespace SnowBound.Mountain
 {
     /// <summary>
-    /// The rest of the world: ridges and peaks beyond the boundary of the
-    /// resort, so the mountain sits in a range rather than on a slab in a
-    /// void.
+    /// The rest of the world.
     ///
-    /// It is one coarse mesh with no colliders, because nothing will ever
-    /// walk on it. Inside the playable rectangle it is pushed below the real
-    /// terrain and simply hides underneath, which avoids cutting a hole in it
-    /// and avoids any seam along the join. It stays flat for a cell or two
-    /// past the boundary as well, so a triangle straddling the edge cannot
-    /// poke up through the snow.
+    /// Three shells at increasing distance and decreasing detail: the country
+    /// immediately beyond the resort, the range behind that, and the peaks on
+    /// the horizon. Each is a coarser mesh than the one inside it, so the
+    /// whole of a ten kilometre view costs about thirty thousand vertices —
+    /// less than a single chunk of the playable terrain.
     ///
-    /// Heights are anchored to the real mountain's own edge, so however the
-    /// resort is retuned the far range still meets it.
+    /// Each shell sinks below the one inside it, which is what stops a coarse
+    /// mesh poking up through a fine one along their shared ground. That is
+    /// also how the innermost shell hides under the resort itself: no hole to
+    /// cut, no seam to keep in sync.
+    ///
+    /// None of it has colliders and none of it casts shadows. It is scenery,
+    /// and its entire job is to make the resort look like part of somewhere
+    /// bigger instead of a slab in a void.
     /// </summary>
     [ExecuteAlways]
     public class FarRange : MonoBehaviour
     {
         const string ContainerName = "GeneratedFarRange";
 
+        [System.Serializable]
+        public class Shell
+        {
+            public string name = "Shell";
+            [Tooltip("Half the width of this shell, in metres from the resort centre.")]
+            public float extent = 1800f;
+            [Tooltip("Metres per quad. Coarse: this is scenery, not terrain.")]
+            public float cellSize = 30f;
+            [Tooltip("Distance over which its peaks rise to full height.")]
+            public float ridgeDistance = 700f;
+            public float ridgeHeight = 380f;
+            [Tooltip("How far it drops below whatever is inside it.")]
+            public float sink = 12f;
+            [Tooltip("Larger features further out, so the horizon reads as huge.")]
+            public float noiseScale = 0.0016f;
+            [Range(0f, 1f)] public float haze = 0f;
+        }
+
         public MountainGenerator mountain;
 
-        [Header("Extent")]
-        [Tooltip("How far out the world goes, in metres from the resort centre.")]
-        public float extent = 1900f;
-        [Tooltip("Metres per quad. Coarse: this is scenery, not terrain.")]
-        public float cellSize = 44f;
+        [Header("Shells, nearest first")]
+        public Shell[] shells =
+        {
+            new Shell { name = "Near country", extent = 1900f, cellSize = 28f,
+                        ridgeDistance = 620f, ridgeHeight = 300f, sink = 8f,
+                        noiseScale = 0.0022f, haze = 0.10f },
 
-        [Header("Shape")]
-        [Tooltip("Distance over which the far peaks rise to full height.")]
-        public float ridgeDistance = 620f;
-        public float ridgeHeight = 420f;
-        [Tooltip("How far the ground falls away outside the resort.")]
-        public float valleyDrop = 46f;
-        [Tooltip("How far under the real terrain the range hides inside the resort.")]
-        public float sink = 6f;
-        public float noiseScale = 0.0016f;
-        public int seed = 4242;
+            new Shell { name = "Range", extent = 3800f, cellSize = 70f,
+                        ridgeDistance = 1500f, ridgeHeight = 620f, sink = 26f,
+                        noiseScale = 0.0011f, haze = 0.34f },
+
+            new Shell { name = "Horizon", extent = 7600f, cellSize = 165f,
+                        ridgeDistance = 3200f, ridgeHeight = 980f, sink = 60f,
+                        noiseScale = 0.00055f, haze = 0.62f }
+        };
 
         [Header("Look")]
-        [Range(20f, 75f)] public float rockAngle = 38f;
+        [Range(20f, 75f)] public float rockAngle = 40f;
+        public float valleyDrop = 60f;
+        [Tooltip("How far under the real terrain the nearest shell hides.")]
+        public float bed = 6f;
+        public int seed = 4242;
 
-        Mesh _mesh;
+        readonly List<Mesh> _meshes = new List<Mesh>();
         Material _snow, _rock;
         float _offsetX, _offsetZ;
 
@@ -56,6 +80,7 @@ namespace SnowBound.Mountain
         static void Kill(Object o)
         {
             if (o == null) return;
+
             if (Application.isPlaying) Object.Destroy(o);
             else Object.DestroyImmediate(o);
         }
@@ -68,13 +93,16 @@ namespace SnowBound.Mountain
                 Transform c = transform.GetChild(i);
                 if (c.name == ContainerName) Kill(c.gameObject);
             }
+
+            foreach (Mesh m in _meshes) Kill(m);
+            _meshes.Clear();
         }
 
         [ContextMenu("Build Now")]
         public void Build()
         {
             if (mountain == null) mountain = MountainGenerator.Instance;
-            if (mountain == null) return;
+            if (mountain == null || shells == null || shells.Length == 0) return;
 
             Clear();
 
@@ -82,8 +110,35 @@ namespace SnowBound.Mountain
             _offsetX = 3000f + (float)rnd.NextDouble() * 4000f;
             _offsetZ = 3000f + (float)rnd.NextDouble() * 4000f;
 
+            Materials();
+
+            var root = new GameObject(ContainerName);
+            root.transform.SetParent(transform, false);
+            root.hideFlags = HideFlags.DontSaveInEditor;
+
+            // Furthest first, so the near shells are drawn over them.
+            for (int i = shells.Length - 1; i >= 0; i--)
+            {
+                float inner = i > 0 ? shells[i - 1].extent : 0f;
+                BuildShell(root.transform, shells[i], inner, i);
+            }
+        }
+
+        void Materials()
+        {
+            if (_snow == null)
+                _snow = MaterialFactory.CreateSurface("FarSnow", ProceduralTextures.Windblown(),
+                                                      new Color(0.95f, 0.97f, 1f), 110f, 0.6f);
+
+            if (_rock == null)
+                _rock = MaterialFactory.CreateSurface("FarRock", ProceduralTextures.Rock(),
+                                                      new Color(0.74f, 0.76f, 0.82f), 85f, 0.8f);
+        }
+
+        void BuildShell(Transform root, Shell shell, float inner, int index)
+        {
             float centreZ = mountain.length * 0.5f;
-            int steps = Mathf.Max(8, Mathf.RoundToInt(extent * 2f / Mathf.Max(8f, cellSize)));
+            int steps = Mathf.Clamp(Mathf.RoundToInt(shell.extent * 2f / Mathf.Max(8f, shell.cellSize)), 8, 400);
 
             var verts = new Vector3[(steps + 1) * (steps + 1)];
             var snow = new List<int>();
@@ -91,11 +146,12 @@ namespace SnowBound.Mountain
 
             for (int iz = 0; iz <= steps; iz++)
             {
-                float z = centreZ + Mathf.Lerp(-extent, extent, iz / (float)steps);
+                float z = centreZ + Mathf.Lerp(-shell.extent, shell.extent, iz / (float)steps);
+
                 for (int ix = 0; ix <= steps; ix++)
                 {
-                    float x = Mathf.Lerp(-extent, extent, ix / (float)steps);
-                    verts[iz * (steps + 1) + ix] = new Vector3(x, Height(x, z), z);
+                    float x = Mathf.Lerp(-shell.extent, shell.extent, ix / (float)steps);
+                    verts[iz * (steps + 1) + ix] = new Vector3(x, Height(x, z, shell, inner), z);
                 }
             }
 
@@ -109,44 +165,47 @@ namespace SnowBound.Mountain
                 }
             }
 
-            var go = new GameObject(ContainerName);
-            go.transform.SetParent(transform, false);
+            var mesh = new Mesh
+            {
+                name = "FarRange" + index,
+                hideFlags = HideFlags.DontSave,
+                indexFormat = IndexFormat.UInt32
+            };
+
+            mesh.vertices = verts;
+            mesh.subMeshCount = 2;
+            mesh.SetTriangles(snow, 0);
+            mesh.SetTriangles(rock, 1);
+
+            PrimitiveMeshes.ProjectUVs(mesh);
+            mesh.RecalculateNormals();
+            mesh.RecalculateTangents();
+            mesh.RecalculateBounds();
+
+            _meshes.Add(mesh);
+
+            var go = new GameObject(shell.name);
+            go.transform.SetParent(root, false);
             go.hideFlags = HideFlags.DontSaveInEditor;
 
-            _mesh = new Mesh();
-            _mesh.name = "FarRangeMesh";
-            _mesh.hideFlags = HideFlags.DontSave;
-            _mesh.indexFormat = IndexFormat.UInt32;
-            _mesh.vertices = verts;
-            _mesh.subMeshCount = 2;
-            _mesh.SetTriangles(snow, 0);
-            _mesh.SetTriangles(rock, 1);
-
-            SnowBound.Core.PrimitiveMeshes.ProjectUVs(_mesh);
-            _mesh.RecalculateNormals();
-            _mesh.RecalculateTangents();
-            _mesh.RecalculateBounds();
-
-            if (_snow == null)
-                _snow = MaterialFactory.CreateSurface("FarSnow", ProceduralTextures.Windblown(),
-                                                      new Color(0.94f, 0.96f, 1f), 90f, 0.7f);
-            if (_rock == null)
-                _rock = MaterialFactory.CreateSurface("FarRock", ProceduralTextures.Rock(),
-                                                      new Color(0.78f, 0.79f, 0.83f), 70f, 0.9f);
-
-            go.AddComponent<MeshFilter>().sharedMesh = _mesh;
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
 
             var renderer = go.AddComponent<MeshRenderer>();
             renderer.sharedMaterials = new[] { _snow, _rock };
+
             // Scenery casts nothing: the shadow map is better spent on the resort.
             renderer.shadowCastingMode = ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+            renderer.lightProbeUsage = LightProbeUsage.Off;
+            renderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
         }
 
         /// <summary>
-        /// Height of the world outside the resort, anchored to the resort's
-        /// own edge so the two always meet.
+        /// Height of one shell. Anchored to the resort's own edge so the
+        /// nearest one always meets it, sunk below whatever is inside it, and
+        /// rising into ridges as it gets further away.
         /// </summary>
-        float Height(float x, float z)
+        float Height(float x, float z, Shell shell, float inner)
         {
             float half = mountain.width * 0.5f;
 
@@ -156,36 +215,44 @@ namespace SnowBound.Mountain
 
             float away = Vector2.Distance(new Vector2(x, z), new Vector2(nearestX, nearestZ));
 
-            // Inside the resort it simply hides under the real thing.
-            if (away < 0.01f) return edge - sink;
+            // Under the resort, and under everything closer in than this shell.
+            float under = bed + shell.sink;
+            if (away < 0.01f) return edge - under;
 
-            // And it stays hidden for a couple of cells beyond the boundary,
-            // so the triangles that straddle the edge stay below the snow.
-            float clear = Mathf.Max(0f, away - cellSize * 1.5f);
+            // Stay hidden for a couple of its own cells past whatever it is
+            // hiding behind, so the triangles that straddle the join cannot
+            // poke up through the finer mesh in front of them.
+            float clear = Mathf.Max(0f, away - Mathf.Max(shell.cellSize * 1.5f, inner - half));
 
-            float t = Mathf.Clamp01(clear / Mathf.Max(1f, ridgeDistance));
+            float t = Mathf.Clamp01(clear / Mathf.Max(1f, shell.ridgeDistance));
             float eased = t * t * (3f - 2f * t);
 
-            // Ridged noise: folding the absolute value gives sharp crests
-            // instead of the rolling blobs plain Perlin produces.
-            float ridge = 0f;
-            float amplitude = 1f;
-            float frequency = noiseScale;
-            float normal = 0f;
+            float ridge = Ridged(x, z, shell.noiseScale);
 
-            for (int i = 0; i < 4; i++)
+            return edge - under - eased * valleyDrop + ridge * shell.ridgeHeight * eased;
+        }
+
+        /// <summary>
+        /// Ridged noise: folding the absolute value gives sharp crests instead
+        /// of the rolling blobs plain Perlin produces.
+        /// </summary>
+        float Ridged(float x, float z, float scale)
+        {
+            float sum = 0f, amplitude = 1f, frequency = scale, norm = 0f;
+
+            for (int i = 0; i < 5; i++)
             {
                 float n = Mathf.PerlinNoise((x + _offsetX) * frequency, (z + _offsetZ) * frequency);
-                ridge += (1f - Mathf.Abs(n * 2f - 1f)) * amplitude;
-                normal += amplitude;
+
+                sum += (1f - Mathf.Abs(n * 2f - 1f)) * amplitude;
+                norm += amplitude;
+
                 amplitude *= 0.5f;
                 frequency *= 2.17f;
             }
 
-            ridge = normal > 0f ? ridge / normal : 0f;
-            ridge = Mathf.Pow(ridge, 2.1f);
-
-            return edge - sink - eased * valleyDrop + ridge * ridgeHeight * eased;
+            float ridge = norm > 0f ? sum / norm : 0f;
+            return Mathf.Pow(ridge, 2.1f);
         }
 
         void Sort(Vector3[] verts, int a, int b, int c, List<int> snow, List<int> rock)

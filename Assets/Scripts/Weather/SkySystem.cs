@@ -32,7 +32,7 @@ namespace SnowBound.Weather
         public float exposure = 1.15f;
 
         [Header("Clouds")]
-        public float domeRadius = 3600f;
+        public float domeRadius = 13000f;
         [Tooltip("How far the cloud sheet is above the camera, relative to the radius.")]
         public float domeFlatten = 0.34f;
         public int cloudTexture = 512;
@@ -131,6 +131,24 @@ namespace SnowBound.Weather
 
             Atmosphere(storm, height, golden);
             Clouds(storm);
+            FollowCamera();
+        }
+
+        /// <summary>
+        /// Keep the cloud sheet centred on whoever is looking at it. It has to
+        /// be wider than the furthest mountains or clouds draw in front of
+        /// them, and at that size a fixed dome would leave the camera standing
+        /// near one edge of the sky.
+        /// </summary>
+        void FollowCamera()
+        {
+            if (_dome == null) return;
+
+            Camera cam = Camera.main;
+            if (cam == null) return;
+
+            Vector3 at = cam.transform.position;
+            _dome.position = new Vector3(at.x, transform.position.y, at.z);
         }
 
         void Atmosphere(float storm, float height, float golden)

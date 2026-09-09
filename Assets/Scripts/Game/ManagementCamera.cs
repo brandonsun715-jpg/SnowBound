@@ -37,8 +37,8 @@ namespace SnowBound.Game
         [Header("Height")]
         [Tooltip("Closest the camera comes to the snow.")]
         public float minHeightAboveGround = 8f;
-        public float maxHeightAboveGround = 900f;
-        public float startHeight = 190f;
+        public float maxHeightAboveGround = 1200f;
+        public float startHeight = 260f;
         public float edgeMargin = 30f;
 
         [Header("Feel")]
@@ -74,7 +74,7 @@ namespace SnowBound.Game
 
             // Looking up the hill from just below the base area, so the first
             // thing a new resort shows you is the mountain you get to develop.
-            return new Vector3(0f, 0f, mountain.length * 0.08f);
+            return new Vector3(0f, 0f, mountain.length * 0.05f);
         }
 
         // ---------------- other systems ------------------------------------

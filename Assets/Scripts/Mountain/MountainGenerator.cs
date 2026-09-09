@@ -33,32 +33,32 @@ namespace SnowBound.Mountain
         const string ContainerName = "GeneratedTerrain";
 
         [Header("Size (metres)")]
-        public float width = 620f;
-        public float length = 560f;
+        public float width = 1100f;
+        public float length = 900f;
         [Tooltip("Metres between height samples. Smaller is smoother and heavier.")]
-        public float cellSize = 2.5f;
+        public float cellSize = 3.5f;
         [Tooltip("Height samples per chunk edge. Chunks are what get rebuilt when you sculpt.")]
-        public int chunkCells = 24;
+        public int chunkCells = 32;
 
         [Header("Fall line")]
-        public float maxHeight = 210f;
+        public float maxHeight = 260f;
         [Tooltip("1 = straight ramp. Above 1 = gentle at the bottom, steeper at the top.")]
-        public float steepness = 1.55f;
+        public float steepness = 1.5f;
         [Tooltip("Everything below this z is a flat pad for the base area and the lodge.")]
-        public float bottomPadZ = 46f;
+        public float bottomPadZ = 100f;
         [Tooltip("Everything above this z is a flat shoulder at the summit.")]
-        public float topPadZ = 528f;
-        public float padFade = 34f;
+        public float topPadZ = 870f;
+        public float padFade = 60f;
 
         [Header("Shape")]
         [Tooltip("How far the ground rises towards the edges of the map.")]
-        public float rimStart = 215f;
-        public float rimEnd = 300f;
-        public float rimHeight = 120f;
+        public float rimStart = 380f;
+        public float rimEnd = 520f;
+        public float rimHeight = 160f;
 
         [Header("Relief")]
-        [Tooltip("Height of the ridges and gullies. This is what makes it a mountain\nrather than a ramp.")]
-        public float reliefHeight = 92f;
+        [Tooltip("Height of the ridges and gullies. This is the texture on top of\nthe composition, not the composition itself.")]
+        public float reliefHeight = 30f;
         [Tooltip("Size of the main landforms. Smaller number, bigger features.")]
         public float reliefScale = 0.0030f;
         [Tooltip("How far the landforms are bent sideways. Warping is what turns\nround blobs into ridges that flow.")]
@@ -66,11 +66,11 @@ namespace SnowBound.Mountain
 
         [Header("Cliffs and benches")]
         [Tooltip("Height of one step in a cliff band. Zero switches them off.")]
-        public float benchStep = 24f;
+        public float benchStep = 22f;
         [Tooltip("How abrupt each step is. 1 is no step at all, 3 is a wall.")]
         [Range(1f, 4f)] public float benchSharpness = 2.7f;
         [Tooltip("How much of the mountain gets banded. The rest stays smooth.")]
-        [Range(0f, 1f)] public float benchCoverage = 0.55f;
+        [Range(0f, 1f)] public float benchCoverage = 0.42f;
 
         [Header("Terrain noise")]
         public float noiseScale = 0.011f;
@@ -91,7 +91,83 @@ namespace SnowBound.Mountain
         [Tooltip("Leave empty to use the generated snow and rock surfaces.")]
         public Material[] surfaceOverrides;
         [Tooltip("Faces steeper than this show bare rock. A run never does.")]
-        [Range(20f, 75f)] public float rockAngle = 36f;
+        [Range(20f, 75f)] public float rockAngle = 45f;
+
+        /// <summary>
+        /// The mountain, written down.
+        ///
+        /// Two summits, the ridge between them, a bowl under the higher one
+        /// with a headwall across its top, a spur dividing two valleys, two
+        /// chutes off the summit ridge, a shelf at mid mountain and a cliff
+        /// band on the western side. Applied in order, so a bench can flatten
+        /// what a peak raised and a cliff can cut across both.
+        ///
+        /// This is deliberately a list of places rather than a noise function.
+        /// However many octaves noise has, every part of it has the same
+        /// statistics as every other part — so there is nowhere to recognise
+        /// and nothing to plan around, and a ski area is nothing but places
+        /// you learn.
+        /// </summary>
+        [Header("Composition")]
+        public Landform[] composition =
+        {
+            new Landform { name = "Larch Peak", kind = LandformKind.Peak,
+                           at = new Vector2(-140f, 815f), radius = 360f,
+                           strength = 46f, sharpness = 1.9f },
+
+            new Landform { name = "Cornice Peak", kind = LandformKind.Peak,
+                           at = new Vector2(250f, 780f), radius = 320f,
+                           strength = 36f, sharpness = 2.1f },
+
+            new Landform { name = "Summit Ridge", kind = LandformKind.Ridge,
+                           at = new Vector2(-140f, 815f), to = new Vector2(250f, 780f),
+                           radius = 150f, strength = 19f, sharpness = 1.5f },
+
+            new Landform { name = "West Shoulder", kind = LandformKind.Spur,
+                           at = new Vector2(-300f, 730f), to = new Vector2(-450f, 430f),
+                           radius = 185f, strength = 23f, sharpness = 1.5f },
+
+            new Landform { name = "Central Spur", kind = LandformKind.Spur,
+                           at = new Vector2(-20f, 760f), to = new Vector2(15f, 300f),
+                           radius = 205f, strength = 27f, sharpness = 1.45f },
+
+            new Landform { name = "East Ridge", kind = LandformKind.Spur,
+                           at = new Vector2(250f, 780f), to = new Vector2(340f, 380f),
+                           radius = 190f, strength = 22f, sharpness = 1.5f },
+
+            new Landform { name = "North Bowl", kind = LandformKind.Bowl,
+                           at = new Vector2(-215f, 600f), radius = 285f, strength = 38f },
+
+            new Landform { name = "Bowl Headwall", kind = LandformKind.Cliff,
+                           at = new Vector2(-370f, 706f), to = new Vector2(-60f, 688f),
+                           radius = 70f, strength = 36f, sharpness = 3.2f },
+
+            new Landform { name = "Main Valley", kind = LandformKind.Gully,
+                           at = new Vector2(-5f, 700f), to = new Vector2(-30f, 215f),
+                           radius = 210f, strength = 22f, sharpness = 1.25f },
+
+            new Landform { name = "East Valley", kind = LandformKind.Gully,
+                           at = new Vector2(305f, 650f), to = new Vector2(205f, 225f),
+                           radius = 185f, strength = 19f, sharpness = 1.3f },
+
+            new Landform { name = "The Chute", kind = LandformKind.Gully,
+                           at = new Vector2(-120f, 782f), to = new Vector2(-195f, 555f),
+                           radius = 46f, strength = 40f, sharpness = 2.2f },
+
+            new Landform { name = "Fox Couloir", kind = LandformKind.Gully,
+                           at = new Vector2(62f, 762f), to = new Vector2(126f, 566f),
+                           radius = 38f, strength = 34f, sharpness = 2.4f },
+
+            new Landform { name = "Lower Cliffs", kind = LandformKind.Cliff,
+                           at = new Vector2(-430f, 440f), to = new Vector2(-255f, 358f),
+                           radius = 58f, strength = 28f, sharpness = 2.6f },
+
+            new Landform { name = "Mid Bench", kind = LandformKind.Bench,
+                           at = new Vector2(35f, 430f), radius = 140f, strength = 0.72f },
+
+            new Landform { name = "Base Area", kind = LandformKind.Bench,
+                           at = new Vector2(-40f, 80f), radius = 240f, strength = 0.96f }
+        };
 
         /// <summary>The runs the player has cut. Empty on a new resort.</summary>
         [System.NonSerialized] public List<Trail> trails = new List<Trail>();
@@ -111,6 +187,14 @@ namespace SnowBound.Mountain
 
         /// <summary>Raised after the surface changes, with the world rect that moved.</summary>
         public event System.Action<Rect> TerrainChanged;
+
+        /// <summary>
+        /// The highest point on the mountain, in metres, measured rather than
+        /// assumed. Anything that has to sit at an elevation — the tree line
+        /// above all — reads this, so moving a peak moves the forest with it
+        /// instead of leaving a number behind that used to be right.
+        /// </summary>
+        public float Summit { get; private set; }
 
         int _nx, _nz;
         float _x0, _cellX, _cellZ;
@@ -244,6 +328,18 @@ namespace SnowBound.Mountain
             return maxHeight * Mathf.Pow(t, steepness);
         }
 
+        /// <summary>The fall line with the flat pads at either end applied.</summary>
+        float PaddedFallLine(float z)
+        {
+            float h = FallLine(z);
+
+            float kBottom = Smooth01(bottomPadZ, bottomPadZ + padFade, z);
+            h = Mathf.Lerp(FallLine(bottomPadZ), h, kBottom);
+
+            float kTop = Smooth01(topPadZ - padFade, topPadZ, z);
+            return Mathf.Lerp(h, FallLine(topPadZ), kTop);
+        }
+
         float Fbm(float x, float z, float scale, int octaves)
         {
             float sum = 0f, amp = 1f, freq = scale, norm = 0f;
@@ -276,13 +372,7 @@ namespace SnowBound.Mountain
         {
             EnsureNoise();
 
-            float h = FallLine(z);
-
-            float kBottom = Smooth01(bottomPadZ, bottomPadZ + padFade, z);
-            h = Mathf.Lerp(FallLine(bottomPadZ), h, kBottom);
-
-            float kTop = Smooth01(topPadZ - padFade, topPadZ, z);
-            h = Mathf.Lerp(h, FallLine(topPadZ), kTop);
+            float h = PaddedFallLine(z);
 
             // The rim: the map has sides, and they climb. This one applies even
             // over the base area, so there is no way to wander off the edge.
@@ -293,14 +383,72 @@ namespace SnowBound.Mountain
             float wild = Smooth01(bottomPadZ, bottomPadZ + padFade * 1.6f, z);
             if (wild <= 0.001f) return h;
 
+            // The composition first: this is where the mountain gets its shape.
+            h = Compose(h, x, z, wild);
+
+            // Then noise, as texture on the shape rather than as the shape.
             h += (Relief(x, z) - 0.42f) * reliefHeight * wild;
             h += Fbm(x, z, noiseScale, 3) * roughness * wild;
 
-            h = Bench(h, x, z, wild);
+            h = Terrace(h, x, z, wild);
 
             // Berms at the front and back edge so nothing slides off the map.
             h += Smooth01(16f, 0f, z) * 26f;
             h += Smooth01(length - 10f, length, z) * 26f;
+
+            // Never below sea level. A gully running out into the base area
+            // can otherwise cut through the bottom of the map.
+            return Mathf.Max(0f, h);
+        }
+
+        /// <summary>
+        /// Work out what height each shelf settles at, once, from the features
+        /// listed above it. A bench flattens towards a level, and typing that
+        /// level in by hand would make it wrong the moment a peak beside it
+        /// moved.
+        /// </summary>
+        void ResolveBenches()
+        {
+            if (composition == null) return;
+
+            for (int i = 0; i < composition.Length; i++)
+            {
+                Landform form = composition[i];
+                if (form == null || form.kind != LandformKind.Bench) continue;
+
+                if (Mathf.Abs(form.level) > 0.001f) { form.resolvedLevel = form.level; continue; }
+
+                float x = form.at.x, z = form.at.y;
+
+                float h = PaddedFallLine(z);
+                h += Smooth01(rimStart, rimEnd, Mathf.Abs(x)) * rimHeight;
+
+                for (int j = 0; j < i; j++)
+                {
+                    Landform earlier = composition[j];
+                    if (earlier != null) h = earlier.Apply(h, x, z, null);
+                }
+
+                form.resolvedLevel = h;
+            }
+        }
+
+        /// <summary>
+        /// Run the authored features over the ground. Faded in over the base
+        /// area like everything else, so the arrivals area stays flat.
+        /// </summary>
+        float Compose(float h, float x, float z, float wild)
+        {
+            if (composition == null) return h;
+
+            for (int i = 0; i < composition.Length; i++)
+            {
+                Landform form = composition[i];
+                if (form == null) continue;
+
+                float shaped = form.Apply(h, x, z, null);
+                h = Mathf.Lerp(h, shaped, wild);
+            }
 
             return h;
         }
@@ -352,7 +500,7 @@ namespace SnowBound.Mountain
         /// them, over the part of the mountain a mask says is banded. This is
         /// what makes a cliff read as a cliff instead of as a steeper slope.
         /// </summary>
-        float Bench(float h, float x, float z, float wild)
+        float Terrace(float h, float x, float z, float wild)
         {
             if (benchStep < 1f || benchCoverage <= 0.001f) return h;
 
@@ -775,6 +923,7 @@ namespace SnowBound.Mountain
             }
 
             EnsureNoise();
+            ResolveBenches();
             ClearLegacyMesh();
             Allocate();
 
@@ -784,7 +933,18 @@ namespace SnowBound.Mountain
             for (int i = 0; i < _chunks.Count; i++) _chunks[i].Rebuild(this);
 
             MeasureTrails();
+            MeasureSummit();
+
             RaiseChanged(Vector3.zero, Mathf.Max(width, length));
+        }
+
+        /// <summary>One pass over the field. Cheap, and only on a full rebuild.</summary>
+        void MeasureSummit()
+        {
+            float highest = 0f;
+            for (int i = 0; i < _h.Length; i++) if (_h[i] > highest) highest = _h[i];
+
+            Summit = highest;
         }
 
         /// <summary>
