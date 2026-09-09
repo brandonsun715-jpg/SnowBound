@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using SnowBound.Core;
+using SnowBound.Weather;
 
 namespace SnowBound.Player
 {
@@ -35,6 +36,13 @@ namespace SnowBound.Player
         public float minSpeed = 1.5f;
         public LayerMask groundMask = ~0;
 
+        [Header("Filling in")]
+        [Tooltip("Minutes of steady snowfall before a track has filled in and gone.\nNothing fills in while it is not snowing.")]
+        public float fillMinutes = 1.4f;
+        [Tooltip("The colour a fresh track is cut in, and the colour it ends up\nwhen new snow has covered it. It fills in rather than fading out, which\nis both what happens and what an opaque material can do.")]
+        public Color cutColour = new Color(0.80f, 0.84f, 0.92f);
+        public Color filledColour = new Color(0.95f, 0.97f, 1.00f);
+
         [Header("Memory")]
         [Tooltip("Points per chunk of track mesh.")]
         public int pointsPerChunk = 240;
@@ -44,7 +52,17 @@ namespace SnowBound.Player
         Transform _container;
         Material _material;
 
-        readonly List<GameObject> _chunks = new List<GameObject>();
+        /// <summary>One written ribbon and how far the weather has buried it.</summary>
+        class Chunk
+        {
+            public GameObject go;
+            public MeshRenderer renderer;
+            public float filled;
+        }
+
+        readonly List<Chunk> _chunks = new List<Chunk>();
+        readonly MaterialPropertyBlock _block = new MaterialPropertyBlock();
+        WeatherSystem _weather;
         readonly List<Vector3> _verts = new List<Vector3>();
         readonly List<int> _tris = new List<int>();
 
@@ -65,12 +83,14 @@ namespace SnowBound.Player
             _container = container.transform;
 
             _material = MaterialFactory.CreateSurface("SnowTrack", ProceduralTextures.Packed(),
-                                                      new Color(0.80f, 0.84f, 0.92f), 2.4f, 1.4f);
+                                                      cutColour, 2.4f, 1.4f);
         }
 
         void Update()
         {
             if (player == null) return;
+
+            FillIn();
 
             bool drawing = player.IsRidingSnow && player.OnSnow && player.Speed >= minSpeed;
             if (!drawing)
@@ -112,7 +132,7 @@ namespace SnowBound.Player
             renderer.sharedMaterial = _material;
             renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
 
-            _chunks.Add(go);
+            _chunks.Add(new Chunk { go = go, renderer = renderer });
             _verts.Clear();
             _tris.Clear();
             _points = 0;
@@ -120,9 +140,53 @@ namespace SnowBound.Player
 
             while (_chunks.Count > maxChunks)
             {
-                GameObject oldest = _chunks[0];
+                Chunk oldest = _chunks[0];
                 _chunks.RemoveAt(0);
-                DestroyChunk(oldest);
+                DestroyChunk(oldest.go);
+            }
+        }
+
+        /// <summary>
+        /// New snow covers old tracks.
+        ///
+        /// A track is a groove, not a stain: what removes it is snow landing
+        /// in it, so it fills back up to the colour of the field around it
+        /// rather than fading away to nothing — which is also the only thing
+        /// an opaque material can honestly do. Nothing happens at all while
+        /// it is not snowing, so a clear day keeps every line you cut.
+        ///
+        /// The chunk being written is left alone: it would fill in while it
+        /// was still being drawn.
+        /// </summary>
+        void FillIn()
+        {
+            if (_chunks.Count == 0) return;
+
+            if (_weather == null) _weather = WeatherSystem.Instance;
+            float falling = _weather != null ? _weather.Snowfall : 0f;
+            if (falling <= 0.001f) return;
+
+            float rate = falling * Time.deltaTime / Mathf.Max(1f, fillMinutes * 60f);
+
+            for (int i = 0; i < _chunks.Count - 1; i++)
+            {
+                Chunk chunk = _chunks[i];
+                if (chunk.renderer == null) continue;
+
+                chunk.filled = Mathf.Min(1f, chunk.filled + rate);
+
+                _block.SetColor("_BaseColor", Color.Lerp(cutColour, filledColour, chunk.filled));
+                _block.SetColor("_Color", Color.Lerp(cutColour, filledColour, chunk.filled));
+                chunk.renderer.SetPropertyBlock(_block);
+
+                // Buried is gone. Keeping it costs a draw call to render snow
+                // on top of snow.
+                if (chunk.filled >= 1f)
+                {
+                    DestroyChunk(chunk.go);
+                    _chunks.RemoveAt(i);
+                    i--;
+                }
             }
         }
 
@@ -214,7 +278,7 @@ namespace SnowBound.Player
 
         void OnDestroy()
         {
-            foreach (GameObject chunk in _chunks) DestroyChunk(chunk);
+            foreach (Chunk chunk in _chunks) DestroyChunk(chunk.go);
             _chunks.Clear();
 
             if (_container != null) Destroy(_container.gameObject);

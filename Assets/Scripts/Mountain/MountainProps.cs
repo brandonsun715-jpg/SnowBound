@@ -71,6 +71,23 @@ namespace SnowBound.Mountain
             public readonly List<int> tris = new List<int>();
         }
 
+        /// <summary>
+        /// One placed piece of cliff. Planned before anything is planted, so
+        /// the forest and the boulders can be told to keep off it.
+        /// </summary>
+        class Cliff
+        {
+            public Vector3 position;
+            public Quaternion rotation;
+            public Vector3 scale;
+            public float yaw;
+            public float height;
+            public float reach;
+            public bool tooth;
+        }
+
+        readonly List<Cliff> _cliffs = new List<Cliff>();
+
         void Start() { Build(); }
         void OnDisable() { _ground.Stop(); }
 
@@ -116,6 +133,9 @@ namespace SnowBound.Mountain
 
             var container = new GameObject(ContainerName);
             container.transform.SetParent(transform, false);
+
+            // Rock first, everything else around it.
+            PlanCliffs();
 
             SpawnTrees(container.transform);
             SpawnUndergrowth(container.transform);
@@ -223,6 +243,7 @@ namespace SnowBound.Mountain
                 float z = Rand(12f, mountain.length - 12f);
 
                 if (mountain.OnAnyTrail(x, z, pisteClearance)) continue;
+                if (NearCliff(x, z, 1.5f)) continue;
 
                 float h = mountain.SampleHeight(x, z);
                 if (h > treeLine) continue;
@@ -339,6 +360,7 @@ namespace SnowBound.Mountain
                 float z = Rand(10f, mountain.length - 10f);
 
                 if (mountain.OnAnyTrail(x, z, pisteClearance * 0.6f)) continue;
+                if (NearCliff(x, z, 0.5f)) continue;
 
                 float h = mountain.SampleHeight(x, z);
                 float slope = Vector3.Angle(mountain.SampleNormal(x, z), Vector3.up);
@@ -445,6 +467,7 @@ namespace SnowBound.Mountain
                 // Strictly off-piste: keeps the run clean and keeps rocks out
                 // of the base area where the lodge stands.
                 if (mountain.OnAnyTrail(x, z, 2f)) continue;
+                if (NearCliff(x, z, 1f)) continue;
 
                 float h = mountain.SampleHeight(x, z);
 
@@ -525,19 +548,20 @@ namespace SnowBound.Mountain
         /// It shares the boulders' batches, so a whole map of cliffs is not
         /// one extra draw call.
         /// </summary>
-        void SpawnCliffs(MeshBatcher rocks, MeshBatcher settled, Transform colliders,
-                         float unit, bool modelled)
+        void PlanCliffs()
         {
-            if (!modelled || cliffBands <= 0) return;
+            _cliffs.Clear();
+            if (cliffBands <= 0) return;
 
             HeroAssets.Piece slab = HeroAssets.Geometry(HeroAssets.Rocks, "RockSlab");
             HeroAssets.Piece spire = HeroAssets.Geometry(HeroAssets.Rocks, "RockSpire");
             if (slab == null || spire == null) return;
 
-            Mesh slabHull = HeroAssets.Shape(HeroAssets.Rocks, "RockSlab");
-            Mesh spireHull = HeroAssets.Shape(HeroAssets.Rocks, "RockSpire");
-
             float halfW = mountain.width * 0.5f;
+
+            // The same one number the boulders use: the set was drawn two
+            // metres across, so a metre of world is half of it.
+            float unit = 1f / HeroAssets.RockSize;
 
             for (int band = 0; band < cliffBands; band++)
             {
@@ -581,7 +605,10 @@ namespace SnowBound.Mountain
                     float px = x + contour.x * along + drift.x;
                     float pz = z + contour.z * along + drift.z;
 
-                    if (mountain.OnAnyTrail(px, pz, 3f)) continue;
+                    // Wider than it looks: the run's fencing stands a couple
+                    // of metres out from the edge, and a slab through a fence
+                    // panel is worse than a gap in the band.
+                    if (mountain.OnAnyTrail(px, pz, 6f)) continue;
 
                     Vector3 groundNormal = mountain.SampleNormal(px, pz);
                     if (Vector3.Angle(groundNormal, Vector3.up) < minCliffSlopeDeg * 0.7f) continue;
@@ -590,7 +617,6 @@ namespace SnowBound.Mountain
                     bool tooth = _rnd.NextDouble() < 0.22;
 
                     HeroAssets.Piece piece = tooth ? spire : slab;
-                    Mesh hull = tooth ? spireHull : slabHull;
 
                     float size = cliffSize * Rand(0.72f, 1.30f) * (tooth ? 0.65f : 1f);
                     var scale = new Vector3(size * Rand(0.9f, 1.15f), size * Rand(0.85f, 1.2f),
@@ -608,51 +634,105 @@ namespace SnowBound.Mountain
                     // Half buried, measured off the model rather than guessed:
                     // a slab is sunk most of its thickness, a tooth only its
                     // foot, because a tooth is what is left standing.
-                    float height = LocalHeight(piece) * scale.y * unit;
+                    Vector3 extent = LocalSize(piece);
+                    float height = extent.y * scale.y * unit;
                     float sink = height * (tooth ? Rand(0.16f, 0.28f) : Rand(0.30f, 0.52f));
                     var position = new Vector3(px, h - sink, pz);
 
-                    var placement = Matrix4x4.TRS(position, rotation, scale * unit);
-                    rocks.Add(piece.vertices, piece.triangles, 0, placement, piece.uvs);
-
-                    // Snow lies on the top of a slab, level, but only on the
-                    // ones that are lying down — nothing settles on a tooth.
-                    if (!tooth && Vector3.Angle(rotation * Vector3.up, Vector3.up) < 34f)
+                    _cliffs.Add(new Cliff
                     {
-                        var capped = Matrix4x4.TRS(position + Vector3.up * height * 0.26f,
-                                                   Quaternion.Euler(0f, yaw, 0f),
-                                                   new Vector3(scale.x * 0.9f, scale.y * 0.55f,
-                                                               scale.z * 0.9f) * unit);
-                        settled.Add(piece.vertices, piece.triangles, 0, capped);
-                    }
-
-                    if (hull == null) continue;
-
-                    var hit = new GameObject(tooth ? "CliffTooth" : "CliffSlab");
-                    hit.transform.SetParent(colliders, false);
-                    hit.transform.SetPositionAndRotation(position, rotation);
-                    hit.transform.localScale = scale * unit;
-
-                    var collider = hit.AddComponent<MeshCollider>();
-                    collider.sharedMesh = hull;
-                    collider.convex = true;
+                        position = position,
+                        rotation = rotation,
+                        scale = scale,
+                        yaw = yaw,
+                        height = height,
+                        tooth = tooth,
+                        reach = Mathf.Max(extent.x * scale.x, extent.z * scale.z) * unit * 0.5f,
+                    });
                 }
             }
         }
 
-        /// <summary>How tall one piece of geometry is in its own space.</summary>
-        static float LocalHeight(HeroAssets.Piece piece)
+        /// <summary>Write the planned cliffs into the boulders' batches.</summary>
+        void SpawnCliffs(MeshBatcher rocks, MeshBatcher settled, Transform colliders,
+                         float unit, bool modelled)
         {
-            float low = float.MaxValue, high = float.MinValue;
+            if (!modelled || _cliffs.Count == 0) return;
+
+            HeroAssets.Piece slab = HeroAssets.Geometry(HeroAssets.Rocks, "RockSlab");
+            HeroAssets.Piece spire = HeroAssets.Geometry(HeroAssets.Rocks, "RockSpire");
+            if (slab == null || spire == null) return;
+
+            Mesh slabHull = HeroAssets.Shape(HeroAssets.Rocks, "RockSlab");
+            Mesh spireHull = HeroAssets.Shape(HeroAssets.Rocks, "RockSpire");
+
+            foreach (Cliff cliff in _cliffs)
+            {
+                HeroAssets.Piece piece = cliff.tooth ? spire : slab;
+                Mesh hull = cliff.tooth ? spireHull : slabHull;
+
+                var placement = Matrix4x4.TRS(cliff.position, cliff.rotation, cliff.scale * unit);
+                rocks.Add(piece.vertices, piece.triangles, 0, placement, piece.uvs);
+
+                // Snow lies on the top of a slab, level, but only on the ones
+                // that are lying down — nothing settles on a tooth.
+                if (!cliff.tooth && Vector3.Angle(cliff.rotation * Vector3.up, Vector3.up) < 34f)
+                {
+                    var capped = Matrix4x4.TRS(cliff.position + Vector3.up * cliff.height * 0.26f,
+                                               Quaternion.Euler(0f, cliff.yaw, 0f),
+                                               new Vector3(cliff.scale.x * 0.9f, cliff.scale.y * 0.55f,
+                                                           cliff.scale.z * 0.9f) * unit);
+                    settled.Add(piece.vertices, piece.triangles, 0, capped);
+                }
+
+                if (hull == null) continue;
+
+                var hit = new GameObject(cliff.tooth ? "CliffTooth" : "CliffSlab");
+                hit.transform.SetParent(colliders, false);
+                hit.transform.SetPositionAndRotation(cliff.position, cliff.rotation);
+                hit.transform.localScale = cliff.scale * unit;
+
+                var collider = hit.AddComponent<MeshCollider>();
+                collider.sharedMesh = hull;
+                collider.convex = true;
+            }
+        }
+
+        /// <summary>
+        /// True where a cliff already is. Nothing else is planted there: a
+        /// pine growing out of the middle of a slab is the single loudest way
+        /// to say none of this was placed by anybody.
+        /// </summary>
+        bool NearCliff(float x, float z, float clearance)
+        {
+            for (int i = 0; i < _cliffs.Count; i++)
+            {
+                Cliff cliff = _cliffs[i];
+                float dx = x - cliff.position.x;
+                float dz = z - cliff.position.z;
+                float reach = cliff.reach + clearance;
+
+                if (dx * dx + dz * dz < reach * reach) return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>How big one piece of geometry is in its own space.</summary>
+        static Vector3 LocalSize(HeroAssets.Piece piece)
+        {
+            var low = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
+            var high = new Vector3(float.MinValue, float.MinValue, float.MinValue);
 
             for (int i = 0; i < piece.vertices.Count; i++)
             {
-                float y = piece.vertices[i].y;
-                if (y < low) low = y;
-                if (y > high) high = y;
+                low = Vector3.Min(low, piece.vertices[i]);
+                high = Vector3.Max(high, piece.vertices[i]);
             }
 
-            return high > low ? high - low : 1f;
+            Vector3 size = high - low;
+
+            return size.x > 0f ? size : Vector3.one;
         }
 
         /// <summary>
