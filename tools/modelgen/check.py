@@ -45,12 +45,14 @@ EXPECTED = {
     "Trees": ((0, 0, 0), "kit"),
     "Rocks": ((0, 0, 0), "kit"),
     "ParkFeatures": ((0, 0, 0), "kit"),
+    "Flora": ((0, 0, 0), "kit"),
 }
 
 PARTS = {
     "Trees": ["TreeA", "TreeB", "TreeC", "SnowA", "SnowB", "SnowC"],
     "Rocks": ["RockA", "RockB", "RockC"],
     "ParkFeatures": ["Kicker", "Box", "Rail", "Leg"],
+    "Flora": ["ShrubA", "SnowShrubA", "ShrubB", "Fallen", "SnowFallen", "Stump"],
 }
 
 # A rider is a rig: the game finds these by name and turns them, so a

@@ -585,6 +585,12 @@ def preview(ob, path, size=720, samples=48, angle=35, elevation=22, distance=2.9
     scene = bpy.context.scene
 
     parts = each(ob)
+
+    # Blender works out world transforms lazily, and a part that was only
+    # laid out for the picture has not been through that yet — so without
+    # this the camera frames whatever it thinks is at the origin.
+    bpy.context.view_layer.update()
+
     corners = [p.matrix_world @ Vector(c) for p in parts for c in p.bound_box]
     low = Vector((min(c.x for c in corners), min(c.y for c in corners),
                   min(c.z for c in corners)))

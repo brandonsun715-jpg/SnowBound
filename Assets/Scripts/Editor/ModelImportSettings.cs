@@ -77,7 +77,7 @@ namespace SnowBound.EditorTools
             // Everything else stays unreadable, because a readable mesh is a
             // second copy of it in memory.
             string file = System.IO.Path.GetFileNameWithoutExtension(assetPath);
-            importer.isReadable = file == "Trees" || file == "Rocks";
+            importer.isReadable = file == "Trees" || file == "Rocks" || file == "Flora";
             importer.meshCompression = ModelImporterMeshCompression.Medium;
             importer.optimizeMeshPolygons = true;
             importer.optimizeMeshVertices = true;

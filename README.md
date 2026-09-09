@@ -144,7 +144,12 @@ are on screen for the whole run. Both were boxes.
 6. **The mountain itself** — three conifers and three boulders, batched in
    their thousands; a shaped kicker on a levelled pad, a jib box and a
    rail. *(done)*
-7. **A model generator** — every one of them is a script in this repo
+7. **An ecology rather than a scatter** — the forest clumps into stands with
+   clearings, shortens with altitude, and gives way to scrub at the tree
+   line; blown-down trunks and stumps inside the stands, bare bushes in the
+   gaps; boulders low, scree high, and rock where the mountain is steep.
+   *(done)*
+8. **A model generator** — every one of them is a script in this repo
    rather than a binary nobody can edit. *(done)*
 
 ## Making a model
@@ -454,6 +459,17 @@ was created with; picking the wrong one leaves every button silently dead.
   the game still runs, on boxes, and still sits down properly.
 - Poles hang off the hands that hold them rather than floating beside the
   rider, and the skis and the board follow the feet onto the chairlift.
+- A forest scattered evenly is a plantation. Trees grow where trees already
+  are, so the scatter is multiplied by two octaves of noise — one for the
+  stands, one for the gaps inside them — and thins and shortens with
+  altitude before it gives out at the tree line. What is between the trees
+  is placed by the same logic: scrub above the line, bare bushes in the
+  clearings, and blown-down trunks and stumps only inside a stand, where
+  something was standing to fall over.
+- Rocks are placed by geology rather than sprinkled: the chance of one rises
+  with slope, with altitude and inside scoured fields, and its size falls
+  with altitude — boulders low where they rolled to, scree high where it
+  broke off.
 - Eighteen hundred trees cannot be eighteen hundred objects, so the forest
   is not spawned — the models' meshes are read, placed and welded into a
   handful of batched ones, exactly as the procedural trees were. Three

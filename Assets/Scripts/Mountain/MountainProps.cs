@@ -36,8 +36,15 @@ namespace SnowBound.Mountain
         public float maxTreeHeight = 15f;
         public float maxTreeSlopeDeg = 45f;
 
+        [Tooltip("How tightly the forest clumps into stands. A forest scattered\nevenly is a plantation; a real one is stands with clearings between them.")]
+        public float standScale = 0.0055f;
+
+        [Header("Undergrowth")]
+        [Tooltip("Scrub, bushes, fallen trees and stumps. Nothing here collides.")]
+        public int undergrowthCount = 1100;
+
         [Header("Rocks")]
-        public int rockCount = 420;
+        public int rockCount = 900;
         public float minRockSize = 1.5f;
         public float maxRockSize = 5f;
 
@@ -103,6 +110,7 @@ namespace SnowBound.Mountain
             container.transform.SetParent(transform, false);
 
             SpawnTrees(container.transform);
+            SpawnUndergrowth(container.transform);
             SpawnRocks(container.transform);
             SpawnMarkers(container.transform);
 
@@ -218,7 +226,16 @@ namespace SnowBound.Mountain
                 float density = Mathf.InverseLerp(treeLine, fadeFrom, h);
                 if (density < 1f && _rnd.NextDouble() > density * density) continue;
 
-                float height = Rand(minTreeHeight, maxTreeHeight);
+                // And clump. Trees grow where other trees already are, so a
+                // forest is stands with clearings between them rather than an
+                // even scatter — which is the difference between a forest and
+                // a plantation, and it reads from a kilometre away.
+                if (_rnd.NextDouble() > Stand(x, z)) continue;
+
+                // Shorter with altitude: the same species runs out of season
+                // before it runs out of ground.
+                float altitude = Mathf.InverseLerp(0f, Mathf.Max(1f, treeLine), h);
+                float height = Rand(minTreeHeight, maxTreeHeight) * Mathf.Lerp(1.05f, 0.62f, altitude);
                 float girth = Rand(0.82f, 1.2f);
                 var placement = Matrix4x4.TRS(
                     new Vector3(x, h - 0.3f, z),
@@ -252,6 +269,115 @@ namespace SnowBound.Mountain
                 capsule.radius = 0.06f;
                 capsule.height = 0.9f;
                 capsule.center = new Vector3(0f, 0.45f, 0f);
+
+                placed++;
+            }
+
+            batch.Flush();
+        }
+
+        /// <summary>
+        /// How much forest belongs at a point, ignoring altitude: two
+        /// octaves of noise, one for the stands and one for the gaps inside
+        /// them.
+        /// </summary>
+        float Stand(float x, float z)
+        {
+            float stand = Mathf.PerlinNoise((x + 500f) * standScale, (z + 900f) * standScale);
+            float gaps = Mathf.PerlinNoise((x - 200f) * standScale * 3.1f,
+                                           (z + 300f) * standScale * 3.1f);
+
+            return Mathf.Clamp01(stand * 1.35f - 0.20f + (gaps - 0.5f) * 0.30f);
+        }
+
+        // ---------------- undergrowth -------------------------------------
+
+        /// <summary>
+        /// What grows between the trees: scrub at the tree line, bare bushes
+        /// in the clearings, and blown-down trunks and stumps inside the
+        /// stands where they fell.
+        ///
+        /// None of it collides. It is there to break up the ground between
+        /// the trees, which is the difference between a forest and a set of
+        /// trees standing on a white plane.
+        /// </summary>
+        void SpawnUndergrowth(Transform parent)
+        {
+            var scrub = HeroAssets.Geometry(HeroAssets.Flora, "ShrubA");
+            var scrubSnow = HeroAssets.Geometry(HeroAssets.Flora, "SnowShrubA");
+            var bush = HeroAssets.Geometry(HeroAssets.Flora, "ShrubB");
+            var fallen = HeroAssets.Geometry(HeroAssets.Flora, "Fallen");
+            var fallenSnow = HeroAssets.Geometry(HeroAssets.Flora, "SnowFallen");
+            var stump = HeroAssets.Geometry(HeroAssets.Flora, "Stump");
+
+            Material flora = HeroAssets.Surface(HeroAssets.Flora);
+            if (scrub == null || bush == null || fallen == null || stump == null || flora == null)
+                return;
+
+            var batch = new MeshBatcher(parent, "Undergrowth", new[] { flora }, 60000, true);
+
+            float halfW = mountain.width * 0.5f;
+            float treeLine = Mathf.Max(20f, mountain.Summit * treeLineShare);
+
+            int guard = 0;
+            int placed = 0;
+            int guardLimit = Mathf.Max(1000, undergrowthCount * 30);
+
+            while (placed < undergrowthCount && guard < guardLimit)
+            {
+                guard++;
+
+                float x = Rand(-halfW + 10f, halfW - 10f);
+                float z = Rand(10f, mountain.length - 10f);
+
+                if (mountain.OnAnyTrail(x, z, pisteClearance * 0.6f)) continue;
+
+                float h = mountain.SampleHeight(x, z);
+                float slope = Vector3.Angle(mountain.SampleNormal(x, z), Vector3.up);
+                if (slope > 42f) continue;
+
+                float altitude = h / Mathf.Max(1f, treeLine);
+                float stand = Stand(x, z);
+
+                HeroAssets.Piece piece;
+                HeroAssets.Piece snow = null;
+                float size;
+
+                if (altitude > 0.86f)
+                {
+                    // Above the trees: scrub, and only where it is sheltered.
+                    if (altitude > 1.35f || _rnd.NextDouble() > 0.55) continue;
+                    piece = scrub;
+                    snow = scrubSnow;
+                    size = Rand(0.7f, 1.3f);
+                }
+                else if (stand > 0.62f)
+                {
+                    // Inside a stand: what fell, and what was cut.
+                    bool log = _rnd.NextDouble() < 0.45;
+                    piece = log ? fallen : stump;
+                    snow = log ? fallenSnow : null;
+                    size = Rand(0.8f, 1.25f);
+                }
+                else if (stand > 0.18f)
+                {
+                    piece = _rnd.NextDouble() < 0.65 ? bush : scrub;
+                    snow = piece == scrub ? scrubSnow : null;
+                    size = Rand(0.8f, 1.4f);
+                }
+                else
+                {
+                    continue;
+                }
+
+                var placement = Matrix4x4.TRS(
+                    new Vector3(x, h - 0.06f, z),
+                    Quaternion.Euler(Rand(-5f, 5f), Rand(0f, 360f), Rand(-5f, 5f)),
+                    new Vector3(size, size * Rand(0.85f, 1.15f), size));
+
+                batch.Add(piece.vertices, piece.triangles, 0, placement, piece.uvs);
+                if (snow != null)
+                    batch.Add(snow.vertices, snow.triangles, 0, placement, snow.uvs);
 
                 placed++;
             }
@@ -312,30 +438,53 @@ namespace SnowBound.Mountain
                 // of the base area where the lodge stands.
                 if (mountain.OnAnyTrail(x, z, 2f)) continue;
 
-                float sx = Rand(minRockSize, maxRockSize);
+                float h = mountain.SampleHeight(x, z);
+
+                // Rock shows through where the mountain is steep, high, or
+                // has been scoured — not evenly over the whole map. Boulders
+                // sit low where they rolled to; scree lies high where it
+                // broke off.
+                float slope = Vector3.Angle(mountain.SampleNormal(x, z), Vector3.up);
+                float altitude = Mathf.InverseLerp(0f, Mathf.Max(1f, mountain.Summit), h);
+                float field = Mathf.PerlinNoise((x + 1300f) * 0.0075f, (z - 700f) * 0.0075f);
+
+                float chance = Mathf.Clamp01(field * 1.5f - 0.35f)
+                             + Mathf.InverseLerp(24f, 46f, slope) * 0.55f
+                             + altitude * 0.45f;
+
+                if (_rnd.NextDouble() > chance) continue;
+
+                // Big at the bottom, scree at the top.
+                float scale = Mathf.Lerp(1.0f, 0.34f, altitude) * Rand(0.7f, 1.25f);
+                float sx = Mathf.Clamp(maxRockSize * scale, minRockSize * 0.4f, maxRockSize);
                 float sy = sx * Rand(0.5f, 0.9f);
                 float sz = sx * Rand(0.7f, 1.3f);
 
-                Vector3 position = new Vector3(x, mountain.SampleHeight(x, z) - sy * 0.28f, z);
+                Vector3 position = new Vector3(x, h - sy * 0.28f, z);
                 Quaternion tilt = Quaternion.Euler(Rand(-25f, 25f), Rand(0f, 360f), Rand(-25f, 25f));
                 var placement = Matrix4x4.TRS(position, tilt,
                                               new Vector3(sx * unit, sy * unit, sz * unit));
 
-                if (modelled)
-                {
-                    HeroAssets.Piece rock = stone[_rnd.Next(stone.Length)];
-                    rocks.Add(rock.vertices, rock.triangles, 0, placement, rock.uvs);
-                }
-                else
-                {
-                    rocks.Add(boulder.verts, boulder.tris, 0, placement);
-                }
+                HeroAssets.Piece rock = modelled ? stone[_rnd.Next(stone.Length)] : null;
 
-                // Snow settles on top, level, however the boulder is tipped.
-                if (boulder.verts.Count > 0)
+                if (rock != null) rocks.Add(rock.vertices, rock.triangles, 0, placement, rock.uvs);
+                else rocks.Add(boulder.verts, boulder.tris, 0, placement);
+
+                // Snow settles on top, level, however the boulder is tipped —
+                // and it is the same shape as the rock under it, so it sits on
+                // the facets instead of bulging off them.
+                var cap = Matrix4x4.TRS(position + Vector3.up * sy * 0.22f, Quaternion.identity,
+                                        new Vector3(sx * 0.88f, sy * 0.55f, sz * 0.88f));
+
+                if (rock != null)
                 {
-                    var cap = Matrix4x4.TRS(position + Vector3.up * sy * 0.22f, Quaternion.identity,
-                                            new Vector3(sx * 0.88f, sy * 0.55f, sz * 0.88f));
+                    var capped = Matrix4x4.TRS(position + Vector3.up * sy * 0.22f, Quaternion.identity,
+                                               new Vector3(sx * 0.88f * unit, sy * 0.55f * unit,
+                                                           sz * 0.88f * unit));
+                    settled.Add(rock.vertices, rock.triangles, 0, capped);
+                }
+                else if (boulder.verts.Count > 0)
+                {
                     settled.Add(boulder.verts, boulder.tris, 0, cap);
                 }
 
