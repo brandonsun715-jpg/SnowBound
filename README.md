@@ -451,6 +451,12 @@ was created with; picking the wrong one leaves every button silently dead.
   the game still runs, on boxes, and still sits down properly.
 - Poles hang off the hands that hold them rather than floating beside the
   rider, and the skis and the board follow the feet onto the chairlift.
+- An FBX carries its own idea of what a unit means, and getting it wrong
+  does not look like an error: the model imports a hundred times too small
+  and simply is not there. Blender writes that field and reads it back the
+  same way, so a round trip through Blender cannot catch it — `check.py`
+  reads the number raw out of the file instead, and `HeroAssets` measures
+  what actually arrived against the size it was drawn at and says so.
 - One material and one mask per model, cached. A lift has dozens of chairs
   on it, and each one building its own copy of a two-thousand pixel texture
   is how a scene load turns into a stall.

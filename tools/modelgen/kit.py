@@ -540,7 +540,12 @@ def export(ob, folder, name):
         use_selection=True,
         object_types={'MESH', 'EMPTY'},
         apply_unit_scale=True,
-        apply_scale_options='FBX_SCALE_NONE',
+        # Write the scale into the file's unit factor and leave the
+        # geometry in metres. The other options leave a file that says
+        # centimetres and holds metres, which Blender reads back
+        # correctly — it applies the same convention both ways — and
+        # Unity imports a hundred times too small.
+        apply_scale_options='FBX_SCALE_UNITS',
         use_space_transform=True,
         bake_space_transform=False,
         mesh_smooth_type='EDGE',

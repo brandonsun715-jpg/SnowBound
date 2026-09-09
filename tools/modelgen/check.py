@@ -14,6 +14,7 @@ these by their origin and scales them by one measured number.
 """
 
 import os
+import struct
 import sys
 
 import bpy
@@ -55,10 +56,31 @@ RIGS["RiderBoard"] = RIGS["RiderSki"]
 TOLERANCE = 0.35
 
 
+def metres(path):
+    """
+    What the file says a unit means, read out of the FBX itself.
+
+    Blender writes this and Blender reads it back the same way, so a
+    round trip through Blender cannot catch it being wrong. Unity can, and
+    does, by importing everything a hundred times too small. So it is read
+    raw here: 100 means the numbers in the file are metres, which is what
+    Unity wants.
+    """
+    data = open(path, "rb").read(300000)
+    at = data.find(b"UnitScaleFactor")
+    if at < 0:
+        return None
+
+    at = data.index(b"D", data.index(b"Number", at) + 6)
+    return struct.unpack("<d", data[at + 1:at + 9])[0]
+
+
 def check(name):
     path = os.path.join(MODELS, name, name + ".fbx")
     if not os.path.exists(path):
         return "%-18s MISSING" % name, False
+
+    unit = metres(path)
 
     bpy.ops.wm.read_factory_settings(use_empty=True)
     bpy.ops.import_scene.fbx(filepath=path)
@@ -94,14 +116,16 @@ def check(name):
     else:
         stands = abs(low) < 0.06
 
-    ok = fits and stands and uvs and not rig.startswith("RIG")
+    metric = unit is not None and abs(unit - 100.0) < 0.5
+    ok = fits and stands and uvs and metric and not rig.startswith("RIG")
 
-    return ("%-18s %5.2f x %5.2f x %5.2f m  %5d faces  %2d part(s)  %s  %s  %s  %s" %
+    return ("%-18s %5.2f x %5.2f x %5.2f m  %5d faces  %2d part(s)  %s  %s  %s  %s  %s" %
             (name, size[0], size[1], size[2], faces, len(meshes),
              "uv" if uvs else "NO UV",
              "size" if fits else "SIZE(want %.2f x %.2f x %.2f)" % want,
              anchor if stands else "OFF %s (%.2f..%.2f)" % (anchor, low, high),
-             rig)), ok
+             rig,
+             "metres" if metric else "UNITS(%s)" % unit)), ok
 
 
 def main():

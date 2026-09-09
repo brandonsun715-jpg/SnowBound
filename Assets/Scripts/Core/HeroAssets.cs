@@ -46,12 +46,40 @@ namespace SnowBound.Core
         public const string RiderSki = "RiderSki";
         public const string RiderBoard = "RiderBoard";
 
+        /// <summary>
+        /// The longest side each model was drawn at, in metres.
+        ///
+        /// It is here to catch one specific disaster. An FBX carries its own
+        /// idea of what a unit means, and a file that says centimetres while
+        /// holding metres imports a hundred times too small — which does not
+        /// look like an error, it looks like the model failing to appear at
+        /// all. Measuring what actually arrived and comparing it with what
+        /// was drawn turns that into a line in the console and a model the
+        /// right size anyway.
+        /// </summary>
+        static float Drawn(string folder)
+        {
+            switch (folder)
+            {
+                case Chair: return 2.17f;
+                case Tower: return 9.48f;
+                case Station: return 13.60f;
+                case Ski: return SkiLength;
+                case Pole: return 1.25f;
+                case Board: return BoardLength;
+                case RiderSki: return 1.77f;
+                case RiderBoard: return 1.77f;
+                default: return 0f;
+            }
+        }
+
         /// <summary>What a spawned model is called, so it can be told apart
         /// from the placeholder it is standing in for.</summary>
         public const string Container = "HeroModel";
 
         static readonly Dictionary<string, GameObject> Models = new Dictionary<string, GameObject>();
         static readonly Dictionary<string, Material> Surfaces = new Dictionary<string, Material>();
+        static readonly HashSet<string> Reported = new HashSet<string>();
 
         /// <summary>The imported model, or null if it is not in the project.</summary>
         public static GameObject Prefab(string folder)
@@ -195,18 +223,23 @@ namespace SnowBound.Core
             instance.name = Container;
             instance.transform.localPosition = localPosition;
             instance.transform.localRotation = localRotation;
-            instance.transform.localScale = scale;
+            instance.transform.localScale = Vector3.one;
 
-            Material material = Surface(folder);
+            float correction = Correction(folder, instance);
+            instance.transform.localScale = scale * correction;
+
+            // Never leave a renderer without a material. A null material in
+            // URP draws nothing at all, and an asset that silently fails to
+            // appear is the hardest kind of problem to look at.
+            Material material = Surface(folder) ??
+                                MaterialFactory.Create(folder + "Untextured",
+                                                       new Color(0.55f, 0.55f, 0.57f), 0.3f);
 
             foreach (Renderer r in instance.GetComponentsInChildren<Renderer>(true))
             {
-                if (material != null)
-                {
-                    var set = new Material[Mathf.Max(1, r.sharedMaterials.Length)];
-                    for (int i = 0; i < set.Length; i++) set[i] = material;
-                    r.sharedMaterials = set;
-                }
+                var set = new Material[Mathf.Max(1, r.sharedMaterials.Length)];
+                for (int i = 0; i < set.Length; i++) set[i] = material;
+                r.sharedMaterials = set;
 
                 r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
                 r.receiveShadows = true;
@@ -227,6 +260,62 @@ namespace SnowBound.Core
         public static GameObject Spawn(string folder, Transform parent, float scale = 1f)
         {
             return Spawn(folder, parent, Vector3.zero, Quaternion.identity, Vector3.one * scale);
+        }
+
+        /// <summary>
+        /// How far out the model arrived from the size it was drawn at, and
+        /// what to multiply it by to put that right.
+        ///
+        /// Said out loud the first time, because a model that is a hundred
+        /// times too small and a model that failed to load look exactly the
+        /// same from where the player is standing.
+        /// </summary>
+        static float Correction(string folder, GameObject instance)
+        {
+            float drawn = Drawn(folder);
+            float arrived = Longest(instance);
+
+            if (drawn <= 0f || arrived <= 0.0001f) return 1f;
+
+            float ratio = drawn / arrived;
+            if (ratio < 1.25f && ratio > 0.8f) return 1f;
+
+            if (Reported.Add(folder))
+                Debug.LogWarning("[HeroAssets] " + folder + " imported at " +
+                                 arrived.ToString("0.###") + " m but was drawn at " +
+                                 drawn.ToString("0.###") + " m, so it is being scaled by " +
+                                 ratio.ToString("0.###") + ". Its FBX unit scale is wrong.");
+
+            return ratio;
+        }
+
+        /// <summary>The model's longest side, in its own space.</summary>
+        static float Longest(GameObject instance)
+        {
+            Matrix4x4 into = instance.transform.worldToLocalMatrix;
+            var bounds = new Bounds();
+            bool any = false;
+
+            foreach (MeshFilter filter in instance.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (filter.sharedMesh == null) continue;
+
+                Bounds mesh = filter.sharedMesh.bounds;
+                Matrix4x4 place = into * filter.transform.localToWorldMatrix;
+
+                for (int corner = 0; corner < 8; corner++)
+                {
+                    Vector3 point = place.MultiplyPoint3x4(new Vector3(
+                        (corner & 1) == 0 ? mesh.min.x : mesh.max.x,
+                        (corner & 2) == 0 ? mesh.min.y : mesh.max.y,
+                        (corner & 4) == 0 ? mesh.min.z : mesh.max.z));
+
+                    if (!any) { bounds = new Bounds(point, Vector3.zero); any = true; }
+                    else bounds.Encapsulate(point);
+                }
+            }
+
+            return any ? Mathf.Max(bounds.size.x, Mathf.Max(bounds.size.y, bounds.size.z)) : 0f;
         }
 
         /// <summary>
