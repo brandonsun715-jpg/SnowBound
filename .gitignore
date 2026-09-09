@@ -46,3 +46,11 @@ crashlytics-build.properties
 tools/modelgen/preview/
 __pycache__/
 *.pyc
+
+# Installed agent skills (npx skills add). Tool payload, not source: it is
+# several hundred third-party files that one command puts back, so it is
+# reinstalled rather than vendored. Project settings under .claude/ that are
+# not the skill symlinks stay tracked.
+.agents/
+.claude/skills/
+skills-lock.json
