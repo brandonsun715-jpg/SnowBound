@@ -35,7 +35,22 @@ EXPECTED = {
     "ChairliftChair": ((2.00, 0.95, 2.17), "hook"),
     "ChairliftTower": ((5.64, 2.10, 9.48), "sunk"),
     "ChairliftStation": ((11.02, 13.60, 7.93), "sunk"),
+    "RiderSki": ((0.68, 0.73, 1.77), "floor"),
+    "RiderBoard": ((0.75, 0.90, 1.77), "floor"),
 }
+
+# A rider is a rig: the game finds these by name and turns them, so a
+# renamed or unparented part is a rider who cannot sit on the chairlift.
+RIGS = {
+    "RiderSki": {
+        "Hips": None, "Torso": "Hips", "Head": "Torso",
+        "ThighLeft": "Hips", "ShinLeft": "ThighLeft", "BootLeft": "ShinLeft",
+        "ThighRight": "Hips", "ShinRight": "ThighRight", "BootRight": "ShinRight",
+        "ArmLeft": "Torso", "ForearmLeft": "ArmLeft", "HandLeft": "ForearmLeft",
+        "ArmRight": "Torso", "ForearmRight": "ArmRight", "HandRight": "ForearmRight",
+    },
+}
+RIGS["RiderBoard"] = RIGS["RiderSki"]
 
 TOLERANCE = 0.35
 
@@ -52,13 +67,22 @@ def check(name):
     if not meshes:
         return "%-18s NO MESH" % name, False
 
-    ob = meshes[0]
-    size = ob.dimensions
-    low = min((ob.matrix_world @ v.co).z for v in ob.data.vertices)
-    high = max((ob.matrix_world @ v.co).z for v in ob.data.vertices)
+    corners = [(o.matrix_world @ v.co) for o in meshes for v in o.data.vertices]
+    low = min(c.z for c in corners)
+    high = max(c.z for c in corners)
+    size = [max(c[i] for c in corners) - min(c[i] for c in corners) for i in range(3)]
 
-    faces = len(ob.data.polygons)
-    uvs = len(ob.data.uv_layers) > 0
+    faces = sum(len(o.data.polygons) for o in meshes)
+    uvs = all(len(o.data.uv_layers) > 0 for o in meshes)
+
+    rig = "-"
+    if name in RIGS:
+        found = {o.name: (o.parent.name if o.parent else None) for o in meshes}
+        wrong = [part for part, parent in RIGS[name].items()
+                 if part not in found or found[part] != parent]
+        rig = "rig" if not wrong else "RIG(" + ",".join(sorted(wrong)[:3]) + ")"
+        if wrong:
+            uvs = uvs and False
 
     want, anchor = EXPECTED[name]
     fits = all(abs(size[i] - want[i]) < TOLERANCE + want[i] * 0.1 for i in range(3))
@@ -70,13 +94,14 @@ def check(name):
     else:
         stands = abs(low) < 0.06
 
-    ok = fits and stands and uvs
+    ok = fits and stands and uvs and not rig.startswith("RIG")
 
-    return ("%-18s %5.2f x %5.2f x %5.2f m  %5d faces  %s  %s  %s" %
-            (name, size.x, size.y, size.z, faces,
+    return ("%-18s %5.2f x %5.2f x %5.2f m  %5d faces  %2d part(s)  %s  %s  %s  %s" %
+            (name, size[0], size[1], size[2], faces, len(meshes),
              "uv" if uvs else "NO UV",
              "size" if fits else "SIZE(want %.2f x %.2f x %.2f)" % want,
-             anchor if stands else "OFF %s (%.2f..%.2f)" % (anchor, low, high))), ok
+             anchor if stands else "OFF %s (%.2f..%.2f)" % (anchor, low, high),
+             rig)), ok
 
 
 def main():

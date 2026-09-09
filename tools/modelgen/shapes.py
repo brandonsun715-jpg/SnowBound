@@ -141,7 +141,28 @@ def _cross(a, b):
             a[0] * b[1] - a[1] * b[0])
 
 
-def sweep(section, path, up=(0.0, 0.0, 1.0), scale=None):
+def oval(rx, ry, count=16, square=0.0):
+    """
+    A cross-section for a limb or a body: an ellipse, optionally squared
+    off toward a rounded rectangle.
+
+    People are not round. A thigh is wider than it is deep, a chest is much
+    wider than it is deep, and a padded sleeve is nearly square with the
+    corners knocked off — which is what `square` does.
+    """
+    exponent = 1.0 - 0.55 * square
+    points = []
+
+    for i in range(count):
+        angle = 2 * math.pi * i / count
+        c, s = math.cos(angle), math.sin(angle)
+        points.append((rx * math.copysign(abs(c) ** exponent, c),
+                       ry * math.copysign(abs(s) ** exponent, s)))
+
+    return points
+
+
+def sweep(section, path, up=(0.0, 0.0, 1.0), scale=None, sections=None):
     """
     Carry a cross-section along a path, turning it to follow the corners.
 
@@ -164,11 +185,12 @@ def sweep(section, path, up=(0.0, 0.0, 1.0), scale=None):
         lift = _norm(_cross(side, tangent))
 
         factor = scale(i / max(1, len(path) - 1)) if scale else 1.0
+        shape = sections[i] if sections else section
 
         rings.append([(point[0] + (side[0] * u + lift[0] * v) * factor,
                        point[1] + (side[1] * u + lift[1] * v) * factor,
                        point[2] + (side[2] * u + lift[2] * v) * factor)
-                      for u, v in section])
+                      for u, v in shape])
 
     return rings
 

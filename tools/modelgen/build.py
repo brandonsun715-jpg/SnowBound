@@ -25,6 +25,8 @@ sys.path.insert(0, os.path.join(HERE, "pieces"))
 import kit
 
 MODELS = {
+    "skier": ("skier", dict(angle=30, elevation=8, distance=3.2)),
+    "boarder": ("boarder", dict(angle=34, elevation=8, distance=3.2)),
     "ski": ("ski", dict(angle=28, elevation=26)),
     "pole": ("pole", dict(angle=30, elevation=18)),
     "board": ("board", dict(angle=30, elevation=28)),
@@ -42,18 +44,24 @@ def one(key, size, preview_only=False):
     ob = module.make()
 
     folder = os.path.join(ROOT, "Assets", "Resources", "Models", module.NAME)
-    faces = len(ob.data.polygons)
+    faces = sum(len(part.data.polygons) for part in kit.each(ob))
 
     if not preview_only:
         kit.unwrap(ob, margin=0.0025)
         kit.bake(ob, folder, module.NAME, size=size, mask_size=max(512, size // 2))
         kit.export(ob, folder, module.NAME)
 
+    # A model with a rig can be stood in a pose for its picture. It is
+    # posed after export, so what is written is still the neutral rig.
+    if hasattr(module, "pose"):
+        module.pose(kit.each(ob))
+
     shots = os.path.join(HERE, "preview")
     os.makedirs(shots, exist_ok=True)
     kit.preview(ob, os.path.join(shots, module.NAME + ".png"), size=900, samples=64, **shot)
 
-    print("[%s] %d faces, %.0f s" % (module.NAME, faces, time.time() - started))
+    print("[%s] %d faces, %d part(s), %.0f s" %
+          (module.NAME, faces, len(kit.each(ob)), time.time() - started))
 
 
 def main():

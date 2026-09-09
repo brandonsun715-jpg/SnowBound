@@ -139,7 +139,9 @@ are on screen for the whole run. Both were boxes.
    fences and an operator's hut. *(done)*
 4. **Skis, poles and a board** — pressed from the numbers real ones are
    specified by, with bindings on them. *(done)*
-5. **A model generator** — every one of them is a script in this repo
+5. **The player** — a skier and a snowboarder, baggy park kit, hood, big
+   lens, mittens; fifteen parts each so they still bend. *(done)*
+6. **A model generator** — every one of them is a script in this repo
    rather than a binary nobody can edit. *(done)*
 
 ## Making a model
@@ -149,8 +151,9 @@ module (`pip install bpy`). No Blender install and no GUI:
 
 ```
 python3 tools/modelgen/build.py                 every model
-python3 tools/modelgen/build.py chair tower     just those
+python3 tools/modelgen/build.py chair skier     just those
 python3 tools/modelgen/check.py                 read them back and check them
+python3 tools/modelgen/proof.py skier           render one wearing its own maps
 ```
 
 Each model is modelled from primitives at real sizes, bevelled, unwrapped,
@@ -429,6 +432,25 @@ was created with; picking the wrong one leaves every button silently dead.
 - A model that is missing costs the look of the thing and nothing else.
   `HeroAssets.Spawn` returns nothing, the caller keeps the boxes it already
   built, and the game runs exactly as it did before.
+- The riders are a rig, not a mesh. Fifteen parts, each with its origin on
+  the joint it turns about and parented into a chain, so `PlayerVisual` can
+  bend the knees to sit somebody on a chairlift and turn the shoulders
+  across a board by setting `localRotation` on parts it finds by name. No
+  armature, no skinning, no avatar and no animation clips — which is also
+  why every joint is covered by a cuff, a hem or a sleeve.
+- A skier and a snowboarder are two models rather than one body with
+  different gear, because they do not stand the same way. A boarder's feet
+  are strapped fore and aft half a metre apart and both knees drive toward
+  the toe edge, so their legs are not a mirrored pair; a skier's are.
+- The shoulders turn, not the whole rider. A snowboarder's feet cannot
+  leave the board, so `SnowboardMode`'s body yaw is applied to the torso
+  and the hips stay planted — which is what makes the stance read as riding
+  rather than as standing sideways.
+- The fallback body is built round the same joints as the models, so there
+  is one piece of posing code rather than two. If the models are missing
+  the game still runs, on boxes, and still sits down properly.
+- Poles hang off the hands that hold them rather than floating beside the
+  rider, and the skis and the board follow the feet onto the chairlift.
 - One material and one mask per model, cached. A lift has dozens of chairs
   on it, and each one building its own copy of a two-thousand pixel texture
   is how a scene load turns into a stall.

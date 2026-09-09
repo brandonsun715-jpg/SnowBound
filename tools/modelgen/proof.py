@@ -23,6 +23,8 @@ sys.path.insert(0, HERE)
 import kit
 
 NAMES = {
+    "skier": ("RiderSki", dict(angle=30, elevation=8, distance=3.2)),
+    "boarder": ("RiderBoard", dict(angle=34, elevation=8, distance=3.2)),
     "ski": ("Ski", dict(angle=28, elevation=26)),
     "pole": ("SkiPole", dict(angle=30, elevation=18)),
     "board": ("Snowboard", dict(angle=30, elevation=28)),
@@ -77,12 +79,17 @@ def proof(key):
     kit.reset()
     bpy.ops.import_scene.fbx(filepath=os.path.join(folder, name + ".fbx"))
 
-    ob = next(o for o in bpy.context.scene.objects if o.type == 'MESH')
-    ob.data.materials.clear()
-    ob.data.materials.append(dressed(name, folder))
+    meshes = [o for o in bpy.context.scene.objects if o.type == 'MESH']
+    material = dressed(name, folder)
 
-    for polygon in ob.data.polygons:
-        polygon.material_index = 0
+    for ob in meshes:
+        ob.data.materials.clear()
+        ob.data.materials.append(material)
+
+        for polygon in ob.data.polygons:
+            polygon.material_index = 0
+
+    ob = meshes
 
     shots = os.path.join(HERE, "preview")
     os.makedirs(shots, exist_ok=True)

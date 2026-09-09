@@ -21,13 +21,18 @@ BLACK = (0.012, 0.013, 0.015, 1.0)
 # ------------------------------------------------------------- plumbing
 
 
+def _rgba(colour):
+    """Colours are written as three numbers here; Blender wants four."""
+    return tuple(colour) if len(colour) == 4 else (colour[0], colour[1], colour[2], 1.0)
+
+
 def _mat(name, roughness=0.4, metallic=0.0, base=(0.5, 0.5, 0.5, 1.0)):
     mat = bpy.data.materials.new(name)
     mat.use_nodes = True
 
     nt = mat.node_tree
     bsdf = nt.nodes["Principled BSDF"]
-    bsdf.inputs['Base Color'].default_value = base
+    bsdf.inputs['Base Color'].default_value = _rgba(base)
     bsdf.inputs['Roughness'].default_value = roughness
     bsdf.inputs['Metallic'].default_value = metallic
 
@@ -553,5 +558,66 @@ def anodised(name, tint=(0.42, 0.45, 0.50, 1.0), roughness=0.30, scale=40.0):
     nt.links.new(varied.outputs['Color'], bsdf.inputs['Roughness'])
 
     _bump(nt, bsdf, drawn.outputs['Fac'], strength=0.08, distance=0.0003)
+
+    return mat
+
+
+def shell_fabric(name, colour, roughness=0.62, scale=140.0, sheen=0.4):
+    """
+    Technical outerwear: a woven face fabric with a slight sheen and a
+    seam's worth of wear on the edges.
+
+    A jacket is not a painted surface. The weave is what stops a large flat
+    panel of colour reading as plastic, and the sheen is what says the
+    fabric is coated rather than cotton.
+    """
+    mat, nt, bsdf = _mat(name, roughness=roughness, base=colour)
+    bsdf.inputs['Sheen Weight'].default_value = sheen
+    bsdf.inputs['Sheen Roughness'].default_value = 0.35
+
+    vector = _coords(nt, 1.0)
+
+    warp = _wave(nt, vector, scale, distortion=0.3, detail=1.0, bands='X')
+    weft = _wave(nt, vector, scale, distortion=0.3, detail=1.0, bands='Z')
+    weave = _mix(nt, 0.5, warp.outputs['Fac'], weft.outputs['Fac'], blend='DIFFERENCE')
+
+    creases = _noise(nt, vector, 26.0, detail=7.0, roughness=0.6)
+    exposure = _edges(nt, 0.50, 0.58)
+
+    shaded = _mix(nt, _maths(nt, 'MULTIPLY', creases.outputs['Fac'], 0.30).outputs[0],
+                  colour, (colour[0] * 0.55, colour[1] * 0.55, colour[2] * 0.58, 1.0))
+    rubbed = _mix(nt, _maths(nt, 'MULTIPLY', exposure, 0.28).outputs[0],
+                  shaded.outputs['Color'],
+                  (min(1.0, colour[0] * 1.5 + 0.06), min(1.0, colour[1] * 1.5 + 0.06),
+                   min(1.0, colour[2] * 1.5 + 0.06), 1.0))
+    nt.links.new(rubbed.outputs['Color'], bsdf.inputs['Base Color'])
+
+    rough = _ramp(nt, weave.outputs['Color'],
+                  [(0.0, (roughness + 0.10,) * 3), (1.0, (roughness - 0.10,) * 3)])
+    nt.links.new(rough.outputs['Color'], bsdf.inputs['Roughness'])
+
+    height = _mix(nt, 0.45, weave.outputs['Color'], creases.outputs['Fac'])
+    _bump(nt, bsdf, height.outputs['Color'], strength=0.30, distance=0.0010)
+
+    return mat
+
+
+def lens(name, tint, roughness=0.05):
+    """
+    A goggle lens: a mirror with a colour behind it.
+
+    It is modelled as metal because that is what a mirror coating is, and
+    because a transparent lens in a baked game asset is a dark hole.
+    """
+    mat, nt, bsdf = _mat(name, roughness=roughness, metallic=1.0, base=tint)
+
+    vector = _coords(nt, 1.0)
+    sweepy = _noise(nt, vector, 3.0, detail=4.0)
+
+    shaded = _mix(nt, 0.35, tint,
+                  (min(1.0, tint[0] * 1.8 + 0.12), min(1.0, tint[1] * 1.8 + 0.12),
+                   min(1.0, tint[2] * 1.8 + 0.12), 1.0))
+    graded = _mix(nt, sweepy.outputs['Fac'], tint, shaded.outputs['Color'])
+    nt.links.new(graded.outputs['Color'], bsdf.inputs['Base Color'])
 
     return mat

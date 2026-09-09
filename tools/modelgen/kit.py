@@ -22,7 +22,7 @@ import os
 import bpy
 import bmesh
 import numpy as np
-from mathutils import Vector
+from mathutils import Matrix, Vector
 
 R = math.radians
 
@@ -177,6 +177,50 @@ def clone(ob, at=(0, 0, 0), rot=(0, 0, 0), scale=(1, 1, 1)):
 # ------------------------------------------------------------- modifiers
 
 
+def only(obs):
+    """Select a list of objects and make the first one active."""
+    for other in bpy.context.selected_objects:
+        other.select_set(False)
+
+    for ob in obs:
+        ob.select_set(True)
+
+    bpy.context.view_layer.objects.active = obs[0]
+    return obs
+
+
+def each(ob):
+    return list(ob) if isinstance(ob, (list, tuple)) else [ob]
+
+
+def pivot(ob, at):
+    """
+    Move an object's origin to a joint without moving the object.
+
+    A knee has to rotate about the knee. Everything here is modelled in
+    place and then given its origin afterwards, which is much easier to
+    read than modelling every limb at the origin and working out where it
+    has to be put back.
+    """
+    at = Vector(at)
+    ob.data.transform(Matrix.Translation(-at))
+    ob.location = at
+    return ob
+
+
+def attach(child, parent, offset):
+    """
+    Hang one part off another, `offset` being the distance between their
+    two joints. Rotating the parent now carries the child with it, which is
+    the whole of the rig: no bones, no skinning, just parts that turn about
+    the right points.
+    """
+    child.parent = parent
+    child.matrix_parent_inverse = Matrix.Identity(4)
+    child.location = Vector(offset)
+    return child
+
+
 def paint(ob, mat):
     if mat is not None:
         ob.data.materials.clear()
@@ -268,7 +312,7 @@ def unwrap(ob, margin=0.003, angle=66):
     texture and the rest is empty, which is the same as baking at a fifth
     of the resolution and shipping the file size anyway.
     """
-    _active(ob)
+    only(each(ob))
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.select_all(action='SELECT')
     bpy.ops.uv.smart_project(angle_limit=R(angle), island_margin=margin,
@@ -395,6 +439,27 @@ def _save(path, array, size=None, grey=False):
     return path
 
 
+def merged(objs, name="Baking"):
+    """
+    One throwaway mesh of everything, for baking.
+
+    A rider is fifteen parts so it can bend at the knees, but a bake wants
+    one object and one texture. The parts are already unwrapped into a
+    shared atlas by this point, so copying and welding them changes
+    nothing about where anything lands.
+    """
+    copies = []
+
+    for ob in objs:
+        dup = ob.copy()
+        dup.data = ob.data.copy()
+        dup.parent = None
+        bpy.context.collection.objects.link(dup)
+        copies.append(dup)
+
+    return join(copies, name)
+
+
 def bake(ob, folder, name, size=2048, mask_size=1024, normal_size=1024,
          occlusion=0.55, ao_samples=48):
     """
@@ -406,6 +471,9 @@ def bake(ob, folder, name, size=2048, mask_size=1024, normal_size=1024,
     every bolt — is most of what stops a model reading as plastic.
     """
     os.makedirs(folder, exist_ok=True)
+
+    parts = each(ob)
+    ob = parts[0] if len(parts) == 1 else merged(parts)
 
     albedo = _image(name + "_A", size)
     rough = _image(name + "_R", size)
@@ -445,6 +513,9 @@ def bake(ob, folder, name, size=2048, mask_size=1024, normal_size=1024,
     for img in (albedo, rough, metal, normal, ao):
         bpy.data.images.remove(img)
 
+    if len(parts) > 1:
+        bpy.data.objects.remove(ob, do_unlink=True)
+
     return written
 
 
@@ -463,11 +534,11 @@ def export(ob, folder, name):
     os.makedirs(folder, exist_ok=True)
     path = os.path.join(folder, name + ".fbx")
 
-    _active(ob)
+    only(each(ob))
     bpy.ops.export_scene.fbx(
         filepath=path,
         use_selection=True,
-        object_types={'MESH'},
+        object_types={'MESH', 'EMPTY'},
         apply_unit_scale=True,
         apply_scale_options='FBX_SCALE_NONE',
         use_space_transform=True,
@@ -495,8 +566,15 @@ def preview(ob, path, size=720, samples=48, angle=35, elevation=22, distance=2.9
     """
     scene = bpy.context.scene
 
-    dims = ob.dimensions
-    radius = math.sqrt(dims.x ** 2 + dims.y ** 2 + dims.z ** 2) * 0.5
+    parts = each(ob)
+    corners = [p.matrix_world @ Vector(c) for p in parts for c in p.bound_box]
+    low = Vector((min(c.x for c in corners), min(c.y for c in corners),
+                  min(c.z for c in corners)))
+    high = Vector((max(c.x for c in corners), max(c.y for c in corners),
+                   max(c.z for c in corners)))
+    centre = (low + high) * 0.5
+
+    radius = (high - low).length * 0.5
 
     # Frame the bounding sphere against the narrower of the two fields of
     # view, or anything tall — a pole, a tower — comes out with its top cut
@@ -519,12 +597,6 @@ def preview(ob, path, size=720, samples=48, angle=35, elevation=22, distance=2.9
     sun.rotation_euler = (R(52), 0, R(38))
     bpy.context.collection.objects.link(sun)
 
-    corners = [ob.matrix_world @ Vector(c) for c in ob.bound_box]
-    low = Vector((min(c.x for c in corners), min(c.y for c in corners),
-                  min(c.z for c in corners)))
-    high = Vector((max(c.x for c in corners), max(c.y for c in corners),
-                   max(c.z for c in corners)))
-    centre = (low + high) * 0.5
     theta, phi = R(angle), R(elevation)
     eye = centre + Vector((math.sin(theta) * math.cos(phi),
                            -math.cos(theta) * math.cos(phi),

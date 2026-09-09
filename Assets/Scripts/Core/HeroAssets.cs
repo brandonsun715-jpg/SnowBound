@@ -43,6 +43,8 @@ namespace SnowBound.Core
         public const string Ski = "Ski";
         public const string Pole = "SkiPole";
         public const string Board = "Snowboard";
+        public const string RiderSki = "RiderSki";
+        public const string RiderBoard = "RiderBoard";
 
         /// <summary>What a spawned model is called, so it can be told apart
         /// from the placeholder it is standing in for.</summary>
