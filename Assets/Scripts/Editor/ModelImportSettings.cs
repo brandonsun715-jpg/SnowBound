@@ -115,30 +115,58 @@ namespace SnowBound.EditorTools
             EditorApplication.delayCall += Repair;
         }
 
-        [MenuItem("SnowBound/Reimport Model Textures", false, 42)]
+        [MenuItem("SnowBound/Reimport Model Assets", false, 42)]
         static void Repair()
         {
             const string folder = "Assets/Resources/Models";
             if (!System.IO.Directory.Exists(folder)) return;
 
-            int fixedUp = 0;
+            int textures = 0;
+            int models = 0;
 
             foreach (string guid in AssetDatabase.FindAssets("t:Texture2D", new[] { folder }))
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid);
 
                 var importer = AssetImporter.GetAtPath(path) as TextureImporter;
-                if (importer == null) continue;
-
-                if (!Wrong(importer, path)) continue;
+                if (importer == null || !Wrong(importer, path)) continue;
 
                 AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
-                fixedUp++;
+                textures++;
             }
 
-            if (fixedUp > 0)
-                Debug.Log("[SnowBound] Reimported " + fixedUp +
-                          " model texture(s) with the wrong import settings.");
+            // And the models themselves, which used to be left out.
+            //
+            // A model imported before the postprocessor asked for CPU access
+            // keeps isReadable off, and nothing ever turns it back on. That is
+            // not a small cosmetic difference: the forest, the rocks, the
+            // cliffs, the flora, the resort props and every guest are read off
+            // the CPU and welded into batches, so an unreadable model does not
+            // draw wrong — it does not draw at all, and the scene quietly
+            // falls back to primitives with one warning in the console.
+            foreach (string guid in AssetDatabase.FindAssets("t:Model", new[] { folder }))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+
+                var importer = AssetImporter.GetAtPath(path) as ModelImporter;
+                if (importer == null || !WrongModel(importer, path)) continue;
+
+                AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+                models++;
+            }
+
+            if (textures > 0 || models > 0)
+                Debug.Log("[SnowBound] Reimported " + models + " model(s) and " + textures +
+                          " texture(s) with the wrong import settings.");
+        }
+
+        /// <summary>Does this model disagree with what the postprocessor asks for?</summary>
+        static bool WrongModel(ModelImporter importer, string path)
+        {
+            bool wantsReading = System.IO.Path.GetFileNameWithoutExtension(path) != "Lodge";
+
+            return importer.isReadable != wantsReading ||
+                   importer.materialImportMode != ModelImporterMaterialImportMode.None;
         }
 
         /// <summary>Does this file disagree with what the postprocessor asks for?</summary>

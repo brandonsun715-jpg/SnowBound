@@ -313,9 +313,14 @@ namespace SnowBound.Resort
 
                 want = want * Quaternion.Euler(0f, 0f, _roll);
             }
-            else if (_roll != 0f)
+            else
             {
+                // Off the snow, so the line they were following no longer
+                // means anything. Forgetting it matters: kept, the first
+                // frame of their next run measures a turn against a heading
+                // from minutes ago and throws a lean they never made.
                 _hasHeading = false;
+
                 _roll = Mathf.Lerp(_roll, 0f, 1f - Mathf.Exp(-6f * dt));
                 want = want * Quaternion.Euler(0f, 0f, _roll);
             }
