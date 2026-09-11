@@ -554,8 +554,17 @@ was created with; picking the wrong one leaves every button silently dead.
   mesh, gets no transform with it and lays every tree, rock and bench flat
   on its back. Baking the conversion into the vertices fixes both paths.
   Like the unit, it survives a round trip through Blender untouched, so it
-  is read raw out of the file and compared against what Blender hands back:
-  a good file has its height on Y where Blender has it on Z.
+  is read raw out of the file and compared against what Blender hands back
+  through its object rotation — Blender's importer puts the conversion on
+  the transform and leaves the mesh as the file stores it, so comparing the
+  two meshes directly compares a number with itself.
+- A rig is the exception, and it has to be. Baking is applied per object and
+  takes no account of one being parented to another, so on a fifteen-part
+  rider it pulls the hierarchy apart. Nothing reads a rig raw — the player
+  finds its parts by name and turns them, and a guest is welded through each
+  part's transform — so a rig keeps its conversion in its transforms. The
+  exporter decides that by looking for a part parented to another part,
+  rather than by being told, because the next rig would not remember to say.
 - An FBX carries its own idea of what a unit means, and getting it wrong
   does not look like an error: the model imports a hundred times too small
   and simply is not there. Blender writes that field and reads it back the

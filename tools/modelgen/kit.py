@@ -548,6 +548,10 @@ def export(ob, folder, name):
     path = os.path.join(folder, name + ".fbx")
 
     only(each(ob))
+
+    # A rig is anything one of whose parts is parented to another.
+    going = set(bpy.context.selected_objects)
+    rigged = any(o.parent in going for o in going)
     bpy.ops.export_scene.fbx(
         filepath=path,
         use_selection=True,
@@ -560,12 +564,21 @@ def export(ob, folder, name):
         # Unity imports a hundred times too small.
         apply_scale_options='FBX_SCALE_UNITS',
         use_space_transform=True,
-        # Bake the axis conversion into the vertices, not into the node
-        # transforms. The game reads mesh data directly to batch it, and a
-        # raw read gets no node transform with it — so a file that is only
-        # Y-up by way of its transforms hands the batcher Blender's Z-up
-        # geometry, and every batched tree, rock and bench lies on its back.
-        bake_space_transform=True,
+        # Bake the axis conversion into the vertices, unless the model is a
+        # rig.
+        #
+        # The game reads mesh data directly to batch it, and a raw read gets
+        # no node transform with it — so a file that is only Y-up by way of
+        # its transforms hands the batcher Blender's Z-up geometry, and every
+        # batched tree, rock and bench lies on its back.
+        #
+        # But baking is applied per object and takes no account of one being
+        # parented to another, so on a rig it pulls the hierarchy apart. A
+        # rig is never read raw: the player finds its parts by name and turns
+        # them, and a guest is welded through each part's transform. Both
+        # carry the conversion with them, so a rig is left alone. Measured
+        # rather than remembered, because the next rig would not remember.
+        bake_space_transform=not rigged,
         mesh_smooth_type='EDGE',
         use_mesh_modifiers=True,
         use_tspace=False,

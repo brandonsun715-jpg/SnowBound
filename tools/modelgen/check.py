@@ -150,11 +150,18 @@ def upright(path, meshes):
     if not sizes:
         return True, "no vertices"
 
-    raw = max(sizes, key=sum)
-
+    # Through the object's rotation, with its position dropped.
+    #
+    # Blender's importer puts the axis conversion on the object transform and
+    # leaves the mesh data exactly as the file stores it, so comparing raw
+    # mesh data against Blender's mesh data compares a number with itself.
+    # Turning the vertices by the object's own rotation is what recovers
+    # Blender's idea of which way the model is standing; dropping the
+    # position keeps a kit's side-by-side layout out of the sum.
     local = []
     for ob in meshes:
-        points = [v.co for v in ob.data.vertices]
+        turn = ob.matrix_world.to_3x3()
+        points = [turn @ v.co for v in ob.data.vertices]
         if len(points) < 3:
             continue
         local.append(tuple(max(p[i] for p in points) - min(p[i] for p in points)
@@ -163,7 +170,11 @@ def upright(path, meshes):
     if not local:
         return True, "no vertices"
 
-    here = max(local, key=sum)
+    # Summed over every mesh rather than compared one at a time: the two
+    # lists are in whatever order each reader produced, and a sum does not
+    # care about the order.
+    raw = [sum(size[i] for size in sizes) for i in range(3)]
+    here = [sum(size[i] for size in local) for i in range(3)]
 
     swapped = abs(raw[1] - here[2]) + abs(raw[2] - here[1])
     same = abs(raw[1] - here[1]) + abs(raw[2] - here[2])
@@ -171,7 +182,7 @@ def upright(path, meshes):
     if swapped <= same:
         return True, "Y up"
 
-    return False, "Z UP (height %.2f on Z, should be on Y)" % raw[2]
+    return False, "Z UP (height on Z, should be on Y)"
 
 
 def check(name):
@@ -223,7 +234,14 @@ def check(name):
         stands = abs(low) < 0.06
 
     metric = unit is not None and abs(unit - 100.0) < 0.5
+
+    # A rig carries the axis conversion in its transforms rather than its
+    # vertices, deliberately — baking it per object would pull the hierarchy
+    # apart, and nothing reads a rig's meshes raw. So it is the one shape of
+    # model whose geometry is allowed to be stored the other way up.
     standing, axis = upright(path, meshes)
+    if name in RIGS:
+        standing, axis = True, "rigged"
     ok = (fits and stands and uvs and metric and standing and
           not rig.startswith("RIG") and not rig.startswith("MISSING"))
 
