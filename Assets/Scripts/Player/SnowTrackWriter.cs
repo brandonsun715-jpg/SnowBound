@@ -61,8 +61,14 @@ namespace SnowBound.Player
         }
 
         readonly List<Chunk> _chunks = new List<Chunk>();
-        readonly MaterialPropertyBlock _block = new MaterialPropertyBlock();
         WeatherSystem _weather;
+
+        // Built in Start, not here. A field initializer runs inside the
+        // MonoBehaviour's constructor, and Unity builds components on a
+        // thread where most of its own types cannot be created yet — a
+        // MaterialPropertyBlock among them. Written here it throws before
+        // the component has begun to exist.
+        MaterialPropertyBlock _block;
         readonly List<Vector3> _verts = new List<Vector3>();
         readonly List<int> _tris = new List<int>();
 
@@ -84,6 +90,8 @@ namespace SnowBound.Player
 
             _material = MaterialFactory.CreateSurface("SnowTrack", ProceduralTextures.Packed(),
                                                       cutColour, 2.4f, 1.4f);
+
+            _block = new MaterialPropertyBlock();
         }
 
         void Update()
@@ -162,6 +170,7 @@ namespace SnowBound.Player
         {
             if (_chunks.Count == 0) return;
 
+            if (_block == null) _block = new MaterialPropertyBlock();
             if (_weather == null) _weather = WeatherSystem.Instance;
             float falling = _weather != null ? _weather.Snowfall : 0f;
             if (falling <= 0.001f) return;
