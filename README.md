@@ -545,6 +545,17 @@ was created with; picking the wrong one leaves every button silently dead.
   collider and still the thing the game reasons about — where it is, how it
   is tilted, that it is slick rather than snow — and the tube is hung on it
   and only ever seen.
+- An FBX also carries its own idea of which way is up, and that one is
+  worse, because it can be wrong in two different ways at once. Blender is
+  Z-up and Unity is Y-up, and the exporter will happily record the
+  conversion in the node transforms instead of the vertex data. Unity then
+  renders a spawned model upright — the transform corrects it — while the
+  game, which reads mesh data directly so it can batch a forest into one
+  mesh, gets no transform with it and lays every tree, rock and bench flat
+  on its back. Baking the conversion into the vertices fixes both paths.
+  Like the unit, it survives a round trip through Blender untouched, so it
+  is read raw out of the file and compared against what Blender hands back:
+  a good file has its height on Y where Blender has it on Z.
 - An FBX carries its own idea of what a unit means, and getting it wrong
   does not look like an error: the model imports a hundred times too small
   and simply is not there. Blender writes that field and reads it back the

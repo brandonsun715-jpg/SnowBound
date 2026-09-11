@@ -71,7 +71,10 @@ def one(key, size, preview_only=False):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("models", nargs="*", choices=list(MODELS), default=None)
+    # An empty default, not None: argparse validates the default against
+    # choices too, so `build.py` with no arguments used to fail rather than
+    # build everything.
+    parser.add_argument("models", nargs="*", choices=list(MODELS), default=[])
     parser.add_argument("--size", type=int, default=2048)
     parser.add_argument("--preview-only", action="store_true")
     args = parser.parse_args()

@@ -16,6 +16,7 @@ these by their origin and scales them by one measured number.
 import os
 import struct
 import sys
+import zlib
 
 import bpy
 
@@ -92,6 +93,87 @@ def metres(path):
     return struct.unpack("<d", data[at + 1:at + 9])[0]
 
 
+def stored(path):
+    """
+    The extents of each mesh as the bytes actually hold them.
+
+    Blender writes what it reads, so importing a file back into Blender
+    cannot tell you which way up it is any more than it could tell you what
+    a unit meant — the converter runs in both directions and cancels out.
+    Unity does not: it reads the vertex data, and the game reads it again
+    off the mesh to batch it, with no node transform attached. A file whose
+    geometry is still Z-up hands the batcher trees lying on their backs.
+
+    So the numbers are read raw, out of the file.
+    """
+    data = open(path, "rb").read()
+    sizes = []
+    at = 0
+
+    while True:
+        found = data.find(b"Vertices", at)
+        if found < 0:
+            break
+
+        at = found + 8
+        if data[at:at + 1] != b"d":
+            continue
+
+        length, encoding, packed = struct.unpack("<III", data[at + 1:at + 13])
+        body = data[at + 13:at + 13 + (packed if encoding else length * 8)]
+
+        try:
+            raw = zlib.decompress(body) if encoding else body
+        except zlib.error:
+            continue
+
+        count = len(raw) // 8
+        if count < 9:
+            continue
+
+        numbers = struct.unpack("<%dd" % count, raw[:count * 8])
+        axes = [numbers[i::3] for i in range(3)]
+        sizes.append(tuple(max(a) - min(a) for a in axes))
+
+    return sizes
+
+
+def upright(path, meshes):
+    """
+    Is the geometry stored the way up Unity reads it?
+
+    Blender is Z-up and Unity is Y-up, so a correctly written file holds
+    the height on Y. Compared against the same mesh as Blender hands it
+    back, a good file has its raw Y where Blender has Z.
+    """
+    sizes = stored(path)
+    if not sizes:
+        return True, "no vertices"
+
+    raw = max(sizes, key=sum)
+
+    local = []
+    for ob in meshes:
+        points = [v.co for v in ob.data.vertices]
+        if len(points) < 3:
+            continue
+        local.append(tuple(max(p[i] for p in points) - min(p[i] for p in points)
+                           for i in range(3)))
+
+    if not local:
+        return True, "no vertices"
+
+    here = max(local, key=sum)
+
+    swapped = abs(raw[1] - here[2]) + abs(raw[2] - here[1])
+    same = abs(raw[1] - here[1]) + abs(raw[2] - here[2])
+
+    if swapped <= same:
+        return True, "Y up"
+
+    return False, "Z UP (height %.2f on Z, should be on Y)" % raw[2]
+
+
 def check(name):
     path = os.path.join(MODELS, name, name + ".fbx")
     if not os.path.exists(path):
@@ -141,16 +223,18 @@ def check(name):
         stands = abs(low) < 0.06
 
     metric = unit is not None and abs(unit - 100.0) < 0.5
-    ok = (fits and stands and uvs and metric and
+    standing, axis = upright(path, meshes)
+    ok = (fits and stands and uvs and metric and standing and
           not rig.startswith("RIG") and not rig.startswith("MISSING"))
 
-    return ("%-18s %5.2f x %5.2f x %5.2f m  %5d faces  %2d part(s)  %s  %s  %s  %s  %s" %
+    return ("%-18s %5.2f x %5.2f x %5.2f m  %5d faces  %2d part(s)  %s  %s  %s  %s  %s  %s" %
             (name, size[0], size[1], size[2], faces, len(meshes),
              "uv" if uvs else "NO UV",
              "size" if fits else "SIZE(want %.2f x %.2f x %.2f)" % want,
              anchor if stands else "OFF %s (%.2f..%.2f)" % (anchor, low, high),
              rig,
-             "metres" if metric else "UNITS(%s)" % unit)), ok
+             "metres" if metric else "UNITS(%s)" % unit,
+             axis)), ok
 
 
 def main():

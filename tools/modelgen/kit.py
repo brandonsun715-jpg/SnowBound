@@ -560,7 +560,12 @@ def export(ob, folder, name):
         # Unity imports a hundred times too small.
         apply_scale_options='FBX_SCALE_UNITS',
         use_space_transform=True,
-        bake_space_transform=False,
+        # Bake the axis conversion into the vertices, not into the node
+        # transforms. The game reads mesh data directly to batch it, and a
+        # raw read gets no node transform with it — so a file that is only
+        # Y-up by way of its transforms hands the batcher Blender's Z-up
+        # geometry, and every batched tree, rock and bench lies on its back.
+        bake_space_transform=True,
         mesh_smooth_type='EDGE',
         use_mesh_modifiers=True,
         use_tspace=False,
