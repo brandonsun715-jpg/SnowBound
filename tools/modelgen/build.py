@@ -38,6 +38,7 @@ MODELS = {
     "chair": ("chair", dict(angle=38, elevation=12)),
     "tower": ("tower", dict(angle=42, elevation=14)),
     "station": ("station", dict(angle=48, elevation=16)),
+    "lodge": ("lodge", dict(angle=40, elevation=14, distance=2.9)),
 }
 
 

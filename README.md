@@ -436,6 +436,12 @@ was created with; picking the wrong one leaves every button silently dead.
   of the brightest value there is, so anything heavy-handed either clips it to
   white or drags it to grey. Neutral film response, exposure that follows the
   light, and bloom kept below the threshold where snow starts to glow.
+- The lodge is generated now, like everything else. It was the one model
+  that came from outside this folder, and being outside it meant being
+  outside every check in it — which is how it ended up standing on its end
+  with nothing to catch it. It is built to the placeholder's own numbers,
+  so it arrives the size of the thing it stands in rather than being shrunk
+  to squeeze inside.
 - A hero model replaces a placeholder without replacing it: the placeholder
   keeps its colliders, its entrance point and everything the game reads off
   it, and only its renderers are switched off. The model measures the

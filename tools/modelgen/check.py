@@ -37,6 +37,7 @@ EXPECTED = {
     "ChairliftChair": ((2.00, 0.95, 2.17), "hook"),
     "ChairliftTower": ((5.64, 2.10, 9.48), "sunk"),
     "ChairliftStation": ((11.02, 13.60, 7.93), "sunk"),
+    "Lodge": ((25.40, 22.91, 15.63), "floor"),
     "RiderSki": ((0.68, 0.73, 1.77), "floor"),
     "RiderBoard": ((0.75, 0.90, 1.77), "floor"),
 
