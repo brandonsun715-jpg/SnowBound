@@ -65,16 +65,30 @@ namespace SnowBound.Hud
                 Dress(false, false);
                 if (overview != null) overview.Close();
                 if (dock != null) dock.Close();
+
+                // Escape closes the books. Without this the one screen that
+                // stops time is also the one screen with no way out of it.
+                if (ManagementInput.BackPressed) summary.Close();
                 return;
             }
 
-            bool flying = modes != null && modes.Transitioning;
-            bool managing = modes != null && modes.Mode == GameMode.Management && !flying;
-            bool riding = modes != null && modes.Mode == GameMode.Mountain && !flying;
+            // With no director to ask, assume the player is managing rather
+            // than assuming nothing. Both HUDs and the tool dock hang off
+            // these two flags, so a lost reference used to take the entire
+            // interface down and leave nothing to click on — the worst
+            // possible answer to "I am not sure which mode this is".
+            bool known = modes != null;
+
+            bool flying = known && modes.Transitioning;
+            bool managing = !known || (modes.Mode == GameMode.Management && !flying);
+            bool riding = known && modes.Mode == GameMode.Mountain && !flying;
 
             Dress(riding, managing);
 
-            if (!flying) ReadShortcuts(managing, riding);
+            // Shortcuts are read even mid-flight. Escape is how the player
+            // backs out of anything, and a transition that does not finish
+            // used to take that away too.
+            ReadShortcuts(managing, riding);
 
             WatchForMoments();
         }

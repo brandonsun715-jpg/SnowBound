@@ -158,17 +158,50 @@ namespace SnowBound.Hud
 
         void Update()
         {
-            if (!_open || player == null || player.Input == null) return;
-            if (!player.Input.ContinuePressed) return;
+            if (!_open) return;
+
+            // Closing must not depend on the player existing.
+            //
+            // Opening the books stops time and takes input away, and the only
+            // way back out used to be a key read off the player. A player that
+            // is missing for any reason therefore left the game frozen with no
+            // HUD, no tools and no way to press anything — the interface reads
+            // open books as "show nothing", so there was not even a panel left
+            // to click. Anything that can stop time has to be able to start it
+            // again on its own.
+            bool go = player != null && player.Input != null
+                ? player.Input.ContinuePressed
+                : Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return);
+
+            if (!go) return;
+
+            Close();
+        }
+
+        /// <summary>Put time and input back, whatever state the rest is in.</summary>
+        public void Close()
+        {
+            if (!_open) return;
 
             _open = false;
-            _panel.Hide();
+            if (_panel != null) _panel.Hide();
 
             Time.timeScale = 1f;
-            player.Input.enableInput = _inputWasEnabled;
+            if (player != null && player.Input != null)
+                player.Input.enableInput = _inputWasEnabled;
 
             if (ledger != null && clock != null) ledger.CloseDay(clock.Day);
             if (clock != null) clock.StartNextDay();
+        }
+
+        /// <summary>
+        /// Time is a global, so leaving it stopped outlives this object. If
+        /// the books go away without being closed — a reload, a rebuilt
+        /// interface — time goes back with them.
+        /// </summary>
+        void OnDisable()
+        {
+            if (_open) Time.timeScale = 1f;
         }
     }
 }
