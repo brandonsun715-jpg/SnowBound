@@ -33,49 +33,60 @@ namespace SnowBound.Mountain
         const string ContainerName = "GeneratedTerrain";
 
         [Header("Size (metres)")]
-        public float width = 1100f;
-        public float length = 900f;
+        public float width = 2460f;
+        public float length = 2010f;
         [Tooltip("Metres between height samples. Smaller is smoother and heavier.")]
-        public float cellSize = 3.5f;
+        public float cellSize = 4.0f;
         [Tooltip("Height samples per chunk edge. Chunks are what get rebuilt when you sculpt.")]
         public int chunkCells = 32;
 
         [Header("Fall line")]
-        public float maxHeight = 260f;
+        public float maxHeight = 620f;
         [Tooltip("1 = straight ramp. Above 1 = gentle at the bottom, steeper at the top.")]
         public float steepness = 1.5f;
         [Tooltip("Everything below this z is a flat pad for the base area and the lodge.")]
-        public float bottomPadZ = 100f;
+        public float bottomPadZ = 210f;
         [Tooltip("Everything above this z is a flat shoulder at the summit.")]
-        public float topPadZ = 870f;
-        public float padFade = 60f;
+        public float topPadZ = 1940f;
+        public float padFade = 120f;
 
         [Header("Shape")]
         [Tooltip("How far the ground rises towards the edges of the map.")]
-        public float rimStart = 380f;
-        public float rimEnd = 520f;
-        public float rimHeight = 160f;
+        public float rimStart = 850f;
+        public float rimEnd = 1170f;
+        public float rimHeight = 340f;
 
         [Header("Relief")]
         [Tooltip("Height of the ridges and gullies. This is the texture on top of\nthe composition, not the composition itself.")]
-        public float reliefHeight = 30f;
+        public float reliefHeight = 62f;
         [Tooltip("Size of the main landforms. Smaller number, bigger features.")]
-        public float reliefScale = 0.0030f;
+        public float reliefScale = 0.00134f;
         [Tooltip("How far the landforms are bent sideways. Warping is what turns\nround blobs into ridges that flow.")]
-        public float warp = 130f;
+        public float warp = 290f;
 
         [Header("Cliffs and benches")]
         [Tooltip("Height of one step in a cliff band. Zero switches them off.")]
-        public float benchStep = 22f;
+        public float benchStep = 34f;
         [Tooltip("How abrupt each step is. 1 is no step at all, 3 is a wall.")]
         [Range(1f, 4f)] public float benchSharpness = 2.7f;
         [Tooltip("How much of the mountain gets banded. The rest stays smooth.")]
         [Range(0f, 1f)] public float benchCoverage = 0.42f;
 
+        [Header("Difficulty")]
+        [Tooltip("How far the gentle ground reaches out from the base, in metres.\nInside this the mountain keeps its shape but loses most of its relief,\nwhich is what makes ground a beginner can actually ski.")]
+        public float greenRadius = 700f;
+        public float greenFade = 600f;
+        [Tooltip("What share of the mountain's relief survives on beginner ground.")]
+        [Range(0f, 1f)] public float greenRelief = 0.16f;
+        [Tooltip("Height piled onto the flanks. This is what makes the sides of the\nmap the steep half of the resort rather than just the far half.")]
+        public float flankHeight = 130f;
+        [Tooltip("How far out from the centre line the flanks start to climb.")]
+        public float flankStart = 500f;
+
         [Header("Terrain noise")]
-        public float noiseScale = 0.011f;
+        public float noiseScale = 0.0049f;
         [Tooltip("Bumpiness of the untouched mountain.")]
-        public float roughness = 5.5f;
+        public float roughness = 8.0f;
         public int seed = 12345;
 
         [Header("Runs")]
@@ -83,7 +94,7 @@ namespace SnowBound.Mountain
         public float trailFalloff = 34f;
         [Tooltip("Least grade a cut run is allowed to have, so no run ever runs uphill.")]
         public float minimumTrailGrade = 0.035f;
-        public float rollerSpacing = 78f;
+        public float rollerSpacing = 108f;
         public float rollerHeight = 2.4f;
         public float rollerLength = 26f;
 
@@ -340,6 +351,42 @@ namespace SnowBound.Mountain
             return Mathf.Lerp(h, FallLine(topPadZ), kTop);
         }
 
+        /// <summary>
+        /// How gentle the ground is meant to be here: 1 on the beginner
+        /// apron, 0 everywhere else.
+        ///
+        /// Measured out from the front of the base area rather than from the
+        /// map's corner, because what a beginner needs is a large forgiving
+        /// area around the place they start, and the place they start is the
+        /// lodge.
+        /// </summary>
+        float Mellow(float x, float z)
+        {
+            float dz = Mathf.Max(0f, z - bottomPadZ);
+            float out_ = Mathf.Sqrt(x * x + dz * dz);
+
+            return 1f - Smooth01(greenRadius, greenRadius + greenFade, out_);
+        }
+
+        /// <summary>
+        /// Roughly what this ground would be graded, from 0 for a green to 1
+        /// for something with two diamonds on the sign.
+        ///
+        /// Two things make terrain hard and they are not the same thing:
+        /// height, because the fall line steepens as it climbs, and distance
+        /// from the centre line, because the flanks are piled up. The far top
+        /// corners are both at once, which is where the double blacks are.
+        /// </summary>
+        public float Difficulty(float x, float z)
+        {
+            float up = Smooth01(bottomPadZ, length * 0.85f, z);
+            float across = Smooth01(flankStart, rimStart, Mathf.Abs(x));
+
+            float hard = Mathf.Max(up, across) * 0.8f + up * across * 0.2f;
+
+            return Mathf.Clamp01(hard * (1f - Mellow(x, z)));
+        }
+
         float Fbm(float x, float z, float scale, int octaves)
         {
             float sum = 0f, amp = 1f, freq = scale, norm = 0f;
@@ -383,14 +430,27 @@ namespace SnowBound.Mountain
             float wild = Smooth01(bottomPadZ, bottomPadZ + padFade * 1.6f, z);
             if (wild <= 0.001f) return h;
 
+            // How much relief this ground is allowed. The beginner apron keeps
+            // the mountain's shape and loses most of its texture: rolling and
+            // open rather than flat, because flat is not skiing either.
+            float mellow = Mellow(x, z);
+            float relief = wild * Mathf.Lerp(1f, greenRelief, mellow);
+
+            // The flanks. Out towards the sides the ground piles up, which is
+            // what puts the steep half of the resort on the edges of the map
+            // instead of only at the top of it — and it is faded out over the
+            // beginner ground so the apron stays open on both sides.
+            h += Smooth01(flankStart, rimStart, Mathf.Abs(x)) * flankHeight
+                 * wild * (1f - mellow * 0.60f);
+
             // The composition first: this is where the mountain gets its shape.
             h = Compose(h, x, z, wild);
 
             // Then noise, as texture on the shape rather than as the shape.
-            h += (Relief(x, z) - 0.42f) * reliefHeight * wild;
-            h += Fbm(x, z, noiseScale, 3) * roughness * wild;
+            h += (Relief(x, z) - 0.42f) * reliefHeight * relief;
+            h += Fbm(x, z, noiseScale, 3) * roughness * relief;
 
-            h = Terrace(h, x, z, wild);
+            h = Terrace(h, x, z, relief);
 
             // Berms at the front and back edge so nothing slides off the map.
             h += Smooth01(16f, 0f, z) * 26f;

@@ -25,7 +25,7 @@ namespace SnowBound.Mountain
         public MountainGenerator mountain;
 
         [Header("Pine trees")]
-        public int treeCount = 1800;
+        public int treeCount = 8200;
         [Tooltip("Tree line as a share of the summit. Read off the mountain rather\nthan typed in, so moving a peak moves the forest with it.")]
         [Range(0.2f, 1f)] public float treeLineShare = 0.60f;
         [Tooltip("Metres of thinning below the line. A forest that stops dead along\na contour is the giveaway that nobody planted it.")]
@@ -37,20 +37,20 @@ namespace SnowBound.Mountain
         public float maxTreeSlopeDeg = 45f;
 
         [Tooltip("How tightly the forest clumps into stands. A forest scattered\nevenly is a plantation; a real one is stands with clearings between them.")]
-        public float standScale = 0.0055f;
+        public float standScale = 0.0025f;
 
         [Header("Undergrowth")]
         [Tooltip("Scrub, bushes, fallen trees and stumps. Nothing here collides.")]
-        public int undergrowthCount = 1100;
+        public int undergrowthCount = 5000;
 
         [Header("Rocks")]
-        public int rockCount = 900;
+        public int rockCount = 4200;
         public float minRockSize = 1.5f;
         public float maxRockSize = 5f;
 
         [Header("Cliffs")]
         [Tooltip("Bands of bedded rock on the steep ground. A band is several\nslabs laid along the contour, not one boulder made big.")]
-        public int cliffBands = 34;
+        public int cliffBands = 150;
         [Tooltip("How steep the ground has to be before the rock breaks through.")]
         public float minCliffSlopeDeg = 32f;
         [Tooltip("Width of a slab in the band, in metres.")]

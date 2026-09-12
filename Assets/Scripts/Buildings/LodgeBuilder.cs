@@ -24,8 +24,8 @@ namespace SnowBound.Buildings
         public MountainGenerator mountain;
 
         [Header("Placement (world metres)")]
-        public float positionX = -34f;
-        public float positionZ = 62f;
+        public float positionX = -52f;
+        public float positionZ = 128f;
         [Tooltip("Degrees around Y. Turns the front of the lodge towards the ski run.")]
         public float facingYaw = 70f;
 

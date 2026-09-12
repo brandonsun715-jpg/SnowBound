@@ -595,6 +595,16 @@ was created with; picking the wrong one leaves every button silently dead.
   because URP has nowhere to put a fourth texture and the contact shading
   under a seat and around every bolt is most of what stops a model reading
   as plastic.
+- The mountain is graded, not just generated. Two things make ground hard
+  and they are different things: height, because the fall line steepens as
+  it climbs, and distance from the centre line, because the flanks are
+  piled up. So the resort reads green at the base, blue up the middle,
+  black high, and double black on the upper flanks and the far corners —
+  which are both at once. Around the lodge a wide apron keeps the shape of
+  the mountain but loses most of its relief, because what a beginner needs
+  is rolling and open rather than flat; flat is not skiing either.
+- Everything off a cut run is off piste, and at five square kilometres with
+  a handful of trails on it, that is most of the mountain.
 - **The height field is the mountain.** One array of heights; the chunk meshes
   are built from it and each chunk's collider is that same mesh; `SampleHeight`
   is the same bilinear interpolation the triangles perform. So the surface you

@@ -71,10 +71,10 @@ namespace SnowBound.Core
             {
                 switch (level)
                 {
-                    case Level.Low: return 1400f;
-                    case Level.Medium: return 2200f;
-                    case Level.High: return 3200f;
-                    default: return 4200f;
+                    case Level.Low: return 2600f;
+                    case Level.Medium: return 4000f;
+                    case Level.High: return 5600f;
+                    default: return 7200f;
                 }
             }
         }

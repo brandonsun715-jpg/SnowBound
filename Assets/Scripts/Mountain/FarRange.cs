@@ -33,16 +33,16 @@ namespace SnowBound.Mountain
         {
             public string name = "Shell";
             [Tooltip("Half the width of this shell, in metres from the resort centre.")]
-            public float extent = 1800f;
+            public float extent = 4200f;
             [Tooltip("Metres per quad. Coarse: this is scenery, not terrain.")]
-            public float cellSize = 30f;
+            public float cellSize = 52f;
             [Tooltip("Distance over which its peaks rise to full height.")]
-            public float ridgeDistance = 700f;
-            public float ridgeHeight = 380f;
+            public float ridgeDistance = 1600f;
+            public float ridgeHeight = 760f;
             [Tooltip("How far it drops below whatever is inside it.")]
             public float sink = 12f;
             [Tooltip("Larger features further out, so the horizon reads as huge.")]
-            public float noiseScale = 0.0016f;
+            public float noiseScale = 0.00072f;
             [Range(0f, 1f)] public float haze = 0f;
         }
 
@@ -66,7 +66,7 @@ namespace SnowBound.Mountain
 
         [Header("Look")]
         [Range(20f, 75f)] public float rockAngle = 40f;
-        public float valleyDrop = 60f;
+        public float valleyDrop = 130f;
         [Tooltip("How far under the real terrain the nearest shell hides.")]
         public float bed = 6f;
         public int seed = 4242;
