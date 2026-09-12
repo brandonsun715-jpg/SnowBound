@@ -56,6 +56,11 @@ namespace SnowBound.Buildings
 
         Transform _model;
         Bounds _fittedTo;
+
+        // The rotation the importer put on the model's own root to carry the
+        // file's axis conversion. Kept, because standing the model up means
+        // turning it from there rather than replacing it.
+        Quaternion _own = Quaternion.identity;
         Vector3 _size;
         readonly List<Renderer> _hidden = new List<Renderer>();
 
@@ -103,6 +108,7 @@ namespace SnowBound.Buildings
             }
 
             GameObject instance = Instantiate(prefab, transform);
+            _own = instance.transform.localRotation;
             instance.name = ContainerName;
             instance.hideFlags = HideFlags.DontSaveInEditor;
             _model = instance.transform;
@@ -173,7 +179,7 @@ namespace SnowBound.Buildings
             _fittedTo = target;
 
             instance.transform.localPosition = Vector3.zero;
-            instance.transform.rotation = Facing() * Quaternion.Euler(0f, yaw, 0f);
+            instance.transform.rotation = Facing() * Quaternion.Euler(0f, yaw, 0f) * _own;
             instance.transform.localScale = Vector3.one;
 
             Bounds model;

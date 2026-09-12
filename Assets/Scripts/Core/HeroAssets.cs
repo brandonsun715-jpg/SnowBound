@@ -485,8 +485,20 @@ namespace SnowBound.Core
 
             GameObject instance = Object.Instantiate(prefab, parent);
             instance.name = Container;
+
+            // The importer puts the file's axis conversion on the model's own
+            // root whenever the geometry itself was not written Y-up — which
+            // is every rig, deliberately, and anything that came from outside
+            // this pipeline. Replacing that rotation outright instead of
+            // turning the model from it lays the thing on its back: it is why
+            // the rider skied face down and the lodge stood on its end.
+            //
+            // A model whose geometry was baked Y-up has an identity root here,
+            // so composing costs it nothing.
+            Quaternion own = instance.transform.localRotation;
+
             instance.transform.localPosition = localPosition;
-            instance.transform.localRotation = localRotation;
+            instance.transform.localRotation = localRotation * own;
             instance.transform.localScale = Vector3.one;
 
             float correction = Correction(folder, instance);

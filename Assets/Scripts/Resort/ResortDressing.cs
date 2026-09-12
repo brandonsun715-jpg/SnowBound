@@ -18,6 +18,13 @@ namespace SnowBound.Resort
     ///
     /// All of it is welded into batched meshes and none of it collides. It
     /// is scenery, and scenery you can walk into is a bug report.
+    ///
+    /// What it does NOT do any more is furnish the base area. Benches, bins
+    /// and lamps are things the player buys and puts where they want them,
+    /// and a resort that arrives already furnished has made that decision for
+    /// them. Signs and fencing stay: those belong to the mountain rather than
+    /// to the resort, they go where the runs and the drops are, and neither
+    /// is something anybody would want to place by hand one at a time.
     /// </summary>
     [ExecuteAlways]
     public class ResortDressing : MonoBehaviour
@@ -29,7 +36,8 @@ namespace SnowBound.Resort
         public LodgeBuilder lodge;
 
         [Header("Base area")]
-        public bool dressLodge = true;
+        [Tooltip("Benches, bins, lamps and pushed snow around the lodge door.\nOff: these are furniture the player buys and places, so a resort that\ncame with them already scattered about was furnishing itself.")]
+        public bool dressLodge = false;
 
         [Header("Runs")]
         [Tooltip("A sign at the top of every run.")]
