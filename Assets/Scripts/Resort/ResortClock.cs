@@ -29,7 +29,8 @@ namespace SnowBound.Resort
 
         [Header("Length")]
         [Tooltip("Real minutes for one full resort day.")]
-        public float dayLengthMinutes = 7f;
+        [Tooltip("A day is longer than it was because the mountain is. A run that\ntakes two and a half minutes to ski is most of a seven minute day, and a\nguest who manages two runs before closing never gets anywhere.")]
+        public float dayLengthMinutes = 15f;
 
         [Header("Opening hours")]
         public float opensAt = 8f;

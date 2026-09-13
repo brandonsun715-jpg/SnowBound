@@ -37,7 +37,8 @@ namespace SnowBound.Game
         [Header("Height")]
         [Tooltip("Closest the camera comes to the snow.")]
         public float minHeightAboveGround = 8f;
-        public float maxHeightAboveGround = 1200f;
+        [Tooltip("High enough to see the whole resort at once. At twelve hundred\nyou could see a little over half of it across, which is not a view of a\nski area, it is a view of one side of one.")]
+        public float maxHeightAboveGround = 2200f;
         public float startHeight = 260f;
         public float edgeMargin = 30f;
 

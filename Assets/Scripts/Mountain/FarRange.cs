@@ -51,17 +51,17 @@ namespace SnowBound.Mountain
         [Header("Shells, nearest first")]
         public Shell[] shells =
         {
-            new Shell { name = "Near country", extent = 1900f, cellSize = 28f,
-                        ridgeDistance = 620f, ridgeHeight = 300f, sink = 8f,
-                        noiseScale = 0.0022f, haze = 0.10f },
+            new Shell { name = "Near country", extent = 4250f, cellSize = 52f,
+                        ridgeDistance = 1390f, ridgeHeight = 670f, sink = 18f,
+                        noiseScale = 0.00098f, haze = 0.10f },
 
-            new Shell { name = "Range", extent = 3800f, cellSize = 70f,
-                        ridgeDistance = 1500f, ridgeHeight = 620f, sink = 26f,
-                        noiseScale = 0.0011f, haze = 0.34f },
+            new Shell { name = "Range", extent = 8500f, cellSize = 130f,
+                        ridgeDistance = 3350f, ridgeHeight = 1390f, sink = 58f,
+                        noiseScale = 0.00049f, haze = 0.34f },
 
-            new Shell { name = "Horizon", extent = 7600f, cellSize = 165f,
-                        ridgeDistance = 3200f, ridgeHeight = 980f, sink = 60f,
-                        noiseScale = 0.00055f, haze = 0.62f }
+            new Shell { name = "Horizon", extent = 17000f, cellSize = 300f,
+                        ridgeDistance = 7150f, ridgeHeight = 2190f, sink = 134f,
+                        noiseScale = 0.00025f, haze = 0.62f }
         };
 
         [Header("Look")]

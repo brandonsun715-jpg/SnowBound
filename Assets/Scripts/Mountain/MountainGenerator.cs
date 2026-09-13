@@ -123,61 +123,61 @@ namespace SnowBound.Mountain
         public Landform[] composition =
         {
             new Landform { name = "Larch Peak", kind = LandformKind.Peak,
-                           at = new Vector2(-140f, 815f), radius = 360f,
-                           strength = 46f, sharpness = 1.9f },
+                           at = new Vector2(-313f, 1822f), radius = 805f,
+                           strength = 103f, sharpness = 1.9f },
 
             new Landform { name = "Cornice Peak", kind = LandformKind.Peak,
-                           at = new Vector2(250f, 780f), radius = 320f,
-                           strength = 36f, sharpness = 2.1f },
+                           at = new Vector2(559f, 1743f), radius = 715f,
+                           strength = 80f, sharpness = 2.1f },
 
             new Landform { name = "Summit Ridge", kind = LandformKind.Ridge,
-                           at = new Vector2(-140f, 815f), to = new Vector2(250f, 780f),
-                           radius = 150f, strength = 19f, sharpness = 1.5f },
+                           at = new Vector2(-313f, 1822f), to = new Vector2(559f, 1743f),
+                           radius = 335f, strength = 42f, sharpness = 1.5f },
 
             new Landform { name = "West Shoulder", kind = LandformKind.Spur,
-                           at = new Vector2(-300f, 730f), to = new Vector2(-450f, 430f),
-                           radius = 185f, strength = 23f, sharpness = 1.5f },
+                           at = new Vector2(-670f, 1632f), to = new Vector2(-1006f, 961f),
+                           radius = 413f, strength = 51f, sharpness = 1.5f },
 
             new Landform { name = "Central Spur", kind = LandformKind.Spur,
-                           at = new Vector2(-20f, 760f), to = new Vector2(15f, 300f),
-                           radius = 205f, strength = 27f, sharpness = 1.45f },
+                           at = new Vector2(-45f, 1699f), to = new Vector2(34f, 670f),
+                           radius = 458f, strength = 60f, sharpness = 1.45f },
 
             new Landform { name = "East Ridge", kind = LandformKind.Spur,
-                           at = new Vector2(250f, 780f), to = new Vector2(340f, 380f),
-                           radius = 190f, strength = 22f, sharpness = 1.5f },
+                           at = new Vector2(559f, 1743f), to = new Vector2(760f, 849f),
+                           radius = 425f, strength = 49f, sharpness = 1.5f },
 
             new Landform { name = "North Bowl", kind = LandformKind.Bowl,
-                           at = new Vector2(-215f, 600f), radius = 285f, strength = 38f },
+                           at = new Vector2(-481f, 1341f), radius = 637f, strength = 85f },
 
             new Landform { name = "Bowl Headwall", kind = LandformKind.Cliff,
-                           at = new Vector2(-370f, 706f), to = new Vector2(-60f, 688f),
-                           radius = 70f, strength = 36f, sharpness = 3.2f },
+                           at = new Vector2(-827f, 1578f), to = new Vector2(-134f, 1538f),
+                           radius = 156f, strength = 80f, sharpness = 3.2f },
 
             new Landform { name = "Main Valley", kind = LandformKind.Gully,
-                           at = new Vector2(-5f, 700f), to = new Vector2(-30f, 215f),
-                           radius = 210f, strength = 22f, sharpness = 1.25f },
+                           at = new Vector2(-11f, 1564f), to = new Vector2(-67f, 481f),
+                           radius = 469f, strength = 49f, sharpness = 1.25f },
 
             new Landform { name = "East Valley", kind = LandformKind.Gully,
-                           at = new Vector2(305f, 650f), to = new Vector2(205f, 225f),
-                           radius = 185f, strength = 19f, sharpness = 1.3f },
+                           at = new Vector2(682f, 1453f), to = new Vector2(458f, 503f),
+                           radius = 413f, strength = 42f, sharpness = 1.3f },
 
             new Landform { name = "The Chute", kind = LandformKind.Gully,
-                           at = new Vector2(-120f, 782f), to = new Vector2(-195f, 555f),
-                           radius = 46f, strength = 40f, sharpness = 2.2f },
+                           at = new Vector2(-268f, 1748f), to = new Vector2(-436f, 1240f),
+                           radius = 103f, strength = 89f, sharpness = 2.2f },
 
             new Landform { name = "Fox Couloir", kind = LandformKind.Gully,
-                           at = new Vector2(62f, 762f), to = new Vector2(126f, 566f),
-                           radius = 38f, strength = 34f, sharpness = 2.4f },
+                           at = new Vector2(139f, 1703f), to = new Vector2(282f, 1265f),
+                           radius = 85f, strength = 76f, sharpness = 2.4f },
 
             new Landform { name = "Lower Cliffs", kind = LandformKind.Cliff,
-                           at = new Vector2(-430f, 440f), to = new Vector2(-255f, 358f),
-                           radius = 58f, strength = 28f, sharpness = 2.6f },
+                           at = new Vector2(-961f, 983f), to = new Vector2(-570f, 800f),
+                           radius = 130f, strength = 63f, sharpness = 2.6f },
 
             new Landform { name = "Mid Bench", kind = LandformKind.Bench,
-                           at = new Vector2(35f, 430f), radius = 140f, strength = 0.72f },
+                           at = new Vector2(78f, 961f), radius = 313f, strength = 0.72f },
 
             new Landform { name = "Base Area", kind = LandformKind.Bench,
-                           at = new Vector2(-40f, 80f), radius = 240f, strength = 0.96f }
+                           at = new Vector2(-89f, 179f), radius = 536f, strength = 0.96f }
         };
 
         /// <summary>The runs the player has cut. Empty on a new resort.</summary>
@@ -444,7 +444,14 @@ namespace SnowBound.Mountain
                  * wild * (1f - mellow * 0.60f);
 
             // The composition first: this is where the mountain gets its shape.
-            h = Compose(h, x, z, wild);
+            //
+            // Faded by the same amount as the relief, not by `wild`. The
+            // authored valleys and spurs run a long way down the mountain, and
+            // at full strength they cut straight through the beginner ground
+            // and put a black pitch six hundred metres from the lodge. On the
+            // apron they read as swales instead, which is what gentle ground
+            // with shape in it actually looks like.
+            h = Compose(h, x, z, relief);
 
             // Then noise, as texture on the shape rather than as the shape.
             h += (Relief(x, z) - 0.42f) * reliefHeight * relief;

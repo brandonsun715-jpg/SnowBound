@@ -146,6 +146,12 @@ namespace SnowBound.Mountain
 
             topKickerZ = run.PointAt(alongTrail).z;
             boxZ = run.PointAt(Mathf.Max(0.05f, alongTrail - 0.14f)).z;
+
+            // The rail was the one feature left at a fixed distance up the
+            // mountain while the rest of the park followed the run, so it sat
+            // wherever that number happened to land — on a map twice as long,
+            // that is most of a kilometre away from the boxes it belongs with.
+            railZ = run.PointAt(Mathf.Max(0.04f, alongTrail - 0.22f)).z;
         }
 
         /// <summary>

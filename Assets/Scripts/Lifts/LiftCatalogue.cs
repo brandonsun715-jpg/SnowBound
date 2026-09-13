@@ -75,7 +75,7 @@ namespace SnowBound.Lifts
                         speedWord = "Slow", comfortWord = "Basic",
                         cost = 2500f, dailyUpkeep = 340f,
                         lineSpeed = 2.2f, carrierSpacing = 12f, seats = 1,
-                        maxLength = 260f, maxGrade = 0.34f,
+                        maxLength = 520f, maxGrade = 0.34f,
                         quality = 0.32f
                     },
 
@@ -85,7 +85,7 @@ namespace SnowBound.Lifts
                         speedWord = "Medium", comfortWord = "Fair",
                         cost = 15000f, dailyUpkeep = 2100f,
                         lineSpeed = 2.5f, carrierSpacing = 26f, seats = 4,
-                        maxLength = 620f, maxGrade = 0.7f,
+                        maxLength = 1150f, maxGrade = 0.7f,
                         quality = 0.55f
                     },
 
@@ -98,7 +98,7 @@ namespace SnowBound.Lifts
                         speedWord = "Fast", comfortWord = "Good",
                         cost = 35000f, dailyUpkeep = 4200f,
                         lineSpeed = 5f, carrierSpacing = 18f, seats = 6,
-                        maxLength = 900f, maxGrade = 0.75f,
+                        maxLength = 1700f, maxGrade = 0.75f,
                         quality = 0.78f
                     },
 
@@ -108,7 +108,7 @@ namespace SnowBound.Lifts
                         speedWord = "Fast", comfortWord = "High",
                         cost = 60000f, dailyUpkeep = 6400f,
                         lineSpeed = 6f, carrierSpacing = 22f, seats = 8,
-                        maxLength = 1200f, maxGrade = 0.85f,
+                        maxLength = 2200f, maxGrade = 0.85f,
                         quality = 0.92f
                     }
                 };

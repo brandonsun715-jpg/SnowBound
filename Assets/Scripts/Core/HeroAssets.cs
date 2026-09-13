@@ -36,7 +36,10 @@ namespace SnowBound.Core
         public const float SkiLength = 1.72f;
         public const float PoleLength = 1.20f;
         public const float BoardLength = 1.55f;
-        public const float TreeHeight = 10.00f;    // trunk foot to crown
+        // The three pines are 11.52, 11.88 and 12.48 metres tall, so ten was
+        // asking for a tree and getting one a fifth taller than the number
+        // said. This is the average of what is actually drawn.
+        public const float TreeHeight = 11.96f;    // trunk foot to crown
         public const float RockSize = 2.00f;       // the widest boulder, across
         public const float KickerHeight = 2.00f;   // snow to lip
         public const float BoxLength = 8.00f;      // a jib box or a rail
