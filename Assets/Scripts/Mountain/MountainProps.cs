@@ -136,6 +136,7 @@ namespace SnowBound.Mountain
 
             // Rock first, everything else around it.
             PlanCliffs();
+            IndexCliffs();
 
             SpawnTrees(container.transform);
             SpawnUndergrowth(container.transform);
@@ -698,6 +699,43 @@ namespace SnowBound.Mountain
             }
         }
 
+        // Cliffs bucketed by where they are, so asking "is there one here" does
+        // not mean asking every one of them.
+        //
+        // It used to. Three scatters ask this question once per candidate, and
+        // on a map five times the size that was a third of a million questions
+        // against seven hundred cliffs — two hundred million distance checks
+        // for the forest alone, every time the mountain was rebuilt. Rebuilds
+        // happen when the ground is sculpted and when the quality dial moves,
+        // so that cost was paid in front of the player.
+        const float CliffCell = 32f;
+
+        readonly Dictionary<long, List<Cliff>> _cliffGrid = new Dictionary<long, List<Cliff>>();
+
+        static long CliffKey(float x, float z)
+        {
+            long cx = (long)Mathf.Floor(x / CliffCell);
+            long cz = (long)Mathf.Floor(z / CliffCell);
+
+            return (cx << 32) ^ (cz & 0xffffffffL);
+        }
+
+        void IndexCliffs()
+        {
+            _cliffGrid.Clear();
+
+            foreach (Cliff cliff in _cliffs)
+            {
+                long key = CliffKey(cliff.position.x, cliff.position.z);
+
+                List<Cliff> bucket;
+                if (!_cliffGrid.TryGetValue(key, out bucket))
+                    _cliffGrid[key] = bucket = new List<Cliff>();
+
+                bucket.Add(cliff);
+            }
+        }
+
         /// <summary>
         /// True where a cliff already is. Nothing else is planted there: a
         /// pine growing out of the middle of a slab is the single loudest way
@@ -705,14 +743,29 @@ namespace SnowBound.Mountain
         /// </summary>
         bool NearCliff(float x, float z, float clearance)
         {
-            for (int i = 0; i < _cliffs.Count; i++)
-            {
-                Cliff cliff = _cliffs[i];
-                float dx = x - cliff.position.x;
-                float dz = z - cliff.position.z;
-                float reach = cliff.reach + clearance;
+            if (_cliffGrid.Count == 0) return false;
 
-                if (dx * dx + dz * dz < reach * reach) return true;
+            // A cliff reaches a few metres and the clearance a couple more, so
+            // the neighbouring cells are as far as this can possibly matter.
+            for (int ox = -1; ox <= 1; ox++)
+            {
+                for (int oz = -1; oz <= 1; oz++)
+                {
+                    List<Cliff> bucket;
+                    if (!_cliffGrid.TryGetValue(
+                            CliffKey(x + ox * CliffCell, z + oz * CliffCell), out bucket))
+                        continue;
+
+                    for (int i = 0; i < bucket.Count; i++)
+                    {
+                        Cliff cliff = bucket[i];
+                        float dx = x - cliff.position.x;
+                        float dz = z - cliff.position.z;
+                        float reach = cliff.reach + clearance;
+
+                        if (dx * dx + dz * dz < reach * reach) return true;
+                    }
+                }
             }
 
             return false;

@@ -1,4 +1,6 @@
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 using SnowBound.Mountain;
 using SnowBound.Weather;
 
@@ -39,10 +41,16 @@ namespace SnowBound.Core
         public PostProcessing grade;
 
         [Header("Planting")]
-        [Tooltip("Trees, undergrowth and rocks at Ultra. Every level is a share of these.")]
-        public int trees = 1800;
-        public int undergrowth = 1100;
-        public int rocks = 900;
+        [Tooltip("Trees, undergrowth and rocks at Ultra. Every level is a share of these.\nThese are the numbers, not MountainProps' — this overwrites them — so a\nmap that grew and a forest that did not is this field being left behind.")]
+        public int trees = 8200;
+        public int undergrowth = 5000;
+        public int rocks = 4200;
+
+        [Header("Frame pacing")]
+        [Tooltip("What the game aims for. A steady sixty beats an unsteady ninety:\nthe eye reads the change, not the number.")]
+        public int targetFrameRate = 60;
+        [Tooltip("On, so frames are handed over when the screen is ready for them.")]
+        public bool verticalSync = true;
 
         Level _applied = (Level)(-1);
 
@@ -71,10 +79,10 @@ namespace SnowBound.Core
             {
                 switch (level)
                 {
-                    case Level.Low: return 2600f;
-                    case Level.Medium: return 4000f;
-                    case Level.High: return 5600f;
-                    default: return 7200f;
+                    case Level.Low: return 2000f;
+                    case Level.Medium: return 2800f;
+                    case Level.High: return 3600f;
+                    default: return 4400f;
                 }
             }
         }
@@ -102,18 +110,48 @@ namespace SnowBound.Core
 
         void Screen()
         {
-            // Anti-aliasing costs almost nothing next to the geometry and is
-            // the single biggest difference on a snow scene, where every edge
-            // is a hard white line against a dark tree.
-            switch (level)
+            // Multisampling, and nothing on top of it.
+            //
+            // The scene used to run SMAA over the top of four times MSAA. The
+            // hardware had already resolved every edge by then, so all the
+            // second pass could do was soften what was underneath it — which
+            // is exactly what "blurry" looks like on a snowfield, where most
+            // of the picture is fine texture rather than edges. Post-process
+            // anti-aliasing is now only used at Low, where there is no MSAA
+            // for it to fight with.
+            int samples = level == Level.Low ? 1 : level == Level.Medium ? 2 : 4;
+
+            var pipeline = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
+            if (pipeline != null)
             {
-                case Level.Low: QualitySettings.antiAliasing = 0; break;
-                case Level.Medium: QualitySettings.antiAliasing = 2; break;
-                default: QualitySettings.antiAliasing = 4; break;
+                pipeline.msaaSampleCount = samples;
+
+                // Never below one. Rendering small and stretching up is the
+                // other way a game goes blurry, and it is not worth the frames.
+                pipeline.renderScale = 1f;
+            }
+
+            QualitySettings.antiAliasing = samples > 1 ? samples : 0;
+
+            if (view != null)
+            {
+                var data = view.GetUniversalAdditionalCameraData();
+                if (data != null)
+                {
+                    data.antialiasing = samples > 1
+                        ? AntialiasingMode.None
+                        : AntialiasingMode.SubpixelMorphologicalAntiAliasing;
+                    data.antialiasingQuality = AntialiasingQuality.Medium;
+                }
             }
 
             QualitySettings.lodBias = level == Level.Low ? 0.7f : level == Level.Ultra ? 2f : 1.2f;
             QualitySettings.skinWeights = SkinWeights.TwoBones;
+
+            // A steady rate, because what reads as stutter is the change in
+            // frame time rather than its size.
+            QualitySettings.vSyncCount = verticalSync ? 1 : 0;
+            Application.targetFrameRate = verticalSync ? -1 : Mathf.Max(30, targetFrameRate);
 
             if (grade != null) grade.enabled = level != Level.Low;
         }

@@ -76,7 +76,7 @@ namespace SnowBound.EditorTools
 
             asset.renderScale = 1f;
             asset.msaaSampleCount = 4;
-            asset.shadowDistance = 380f;
+            asset.shadowDistance = 260f;
             asset.shadowCascadeCount = 4;
 
             QualitySettings.antiAliasing = 4;
@@ -152,15 +152,15 @@ namespace SnowBound.EditorTools
             cam.farClipPlane = 16000f;
             cam.nearClipPlane = 0.3f;
 
-            // Multisampling handles the geometry; SMAA cleans up the rest of
-            // the crawling edges, which is most of what reads as pixelation on
-            // a mountain full of thin trees and lift cable.
+            // Post-processing on, but no post-process anti-aliasing set here:
+            // QualityDirector owns that, because whether it helps depends on
+            // whether multisampling is already running. Both at once only
+            // softens what MSAA has already resolved.
             var data = cam.GetUniversalAdditionalCameraData();
             if (data != null)
             {
                 data.renderPostProcessing = true;
-                data.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing;
-                data.antialiasingQuality = AntialiasingQuality.High;
+                data.antialiasing = AntialiasingMode.None;
             }
         }
 

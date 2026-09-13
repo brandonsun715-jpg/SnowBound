@@ -38,7 +38,8 @@ namespace SnowBound.Mountain
         [Tooltip("Metres between height samples. Smaller is smoother and heavier.")]
         public float cellSize = 4.0f;
         [Tooltip("Height samples per chunk edge. Chunks are what get rebuilt when you sculpt.")]
-        public int chunkCells = 32;
+        [Tooltip("Height samples per chunk edge. Chunks are what get rebuilt when\nyou sculpt, and what get drawn. On a map five times the size, thirty-two\nmeant three hundred and twenty of them every frame.")]
+        public int chunkCells = 48;
 
         [Header("Fall line")]
         public float maxHeight = 620f;
