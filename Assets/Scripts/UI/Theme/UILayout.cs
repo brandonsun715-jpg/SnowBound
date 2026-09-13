@@ -59,11 +59,26 @@ namespace SnowBound.Hud
         /// <summary>Everything above the dock stops here.</summary>
         public const float AboveDock = DockBottom + DockHeight + Margin * 0.5f;
 
+        /// <summary>
+        /// The navigation rail down the left: the way into the tools.
+        ///
+        /// It mirrors the inspector rail on the right and stops where the dock
+        /// starts, so the three of them divide the screen between them and
+        /// none of them ever has to know about the others' contents.
+        /// </summary>
+        public const float NavWidth = 196f;
+        public const float NavItemHeight = 40f;
+        public const float NavGap = 4f;
+
+        /// <summary>Left edge for anything that has to clear the nav rail.</summary>
+        public const float PastNav = Margin + NavWidth + Margin * 0.6f;
+
         /// <summary>The inspector rail down the right.</summary>
         public const float RailWidth = 336f;
 
-        /// <summary>Tallest the right-hand rail can be without meeting the dock.</summary>
+        /// <summary>Tallest either rail can be without meeting the dock.</summary>
         public const float RailHeight = Height - UnderTopBar - AboveDock;
+        public const float NavHeight = RailHeight;
 
         // ---- helpers ------------------------------------------------------
 

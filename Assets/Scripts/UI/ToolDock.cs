@@ -49,6 +49,10 @@ namespace SnowBound.Hud
         readonly Dictionary<Page, RectTransform> _pages = new Dictionary<Page, RectTransform>();
         readonly Dictionary<Page, UIButton> _tabs = new Dictionary<Page, UIButton>();
 
+        // The marker down the leading edge of each rail entry, kept so the
+        // open page can be the only one showing one.
+        readonly Dictionary<Page, Image> _marks = new Dictionary<Page, Image>();
+
         class Card
         {
             public UIButton button;
@@ -203,49 +207,100 @@ namespace SnowBound.Hud
         }
 
         /// <summary>
-        /// The row of tabs. It lives outside the panel it opens, because a
-        /// menu you can only reach by already being in the menu is not a menu.
+        /// The navigation rail down the left: the way into the tools.
+        ///
+        /// It lives outside the panel it opens, because a menu you can only
+        /// reach by already being in the menu is not a menu. A rail rather
+        /// than a row along the bottom, because there is room down the side of
+        /// a screen for a word next to each entry, and a labelled list you can
+        /// read is worth more than five chips you have to learn.
+        ///
+        /// It stops where the dock begins, the same way the inspector rail on
+        /// the right does, so the three of them divide the screen up between
+        /// them without any of them knowing about the others.
         /// </summary>
         void BuildTabs()
         {
             var names = new[]
             {
-                new KeyValuePair<Page, string>(Page.Build, "BUILD"),
-                new KeyValuePair<Page, string>(Page.Terrain, "TERRAIN"),
+                new KeyValuePair<Page, string>(Page.Resort, "OVERVIEW"),
                 new KeyValuePair<Page, string>(Page.Trails, "TRAILS"),
                 new KeyValuePair<Page, string>(Page.Lifts, "LIFTS"),
-                new KeyValuePair<Page, string>(Page.Resort, "RESORT")
+                new KeyValuePair<Page, string>(Page.Build, "BUILDINGS"),
+                new KeyValuePair<Page, string>(Page.Terrain, "TERRAIN")
             };
 
-            const float tabWidth = 158f;
-            const float gap = 6f;
-
-            float width = names.Length * (tabWidth + gap) - gap + UITheme.Pad;
-
-            RectTransform bar = UIBuilder.Glass(_canvas.transform, "Tabs",
-                                                new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-                                                new Vector2(0f, UILayout.Margin),
-                                                new Vector2(width, UILayout.TabBarHeight),
-                                                UITheme.RadiusSmall);
+            RectTransform bar = UIBuilder.Glass(_canvas.transform, "NavRail",
+                                                new Vector2(0f, 1f), new Vector2(0f, 1f),
+                                                new Vector2(UILayout.Margin, -UILayout.UnderTopBar),
+                                                new Vector2(UILayout.NavWidth, UILayout.NavHeight));
             UIPointer.Block(bar);
 
             bar.gameObject.AddComponent<CanvasGroup>();
             _bar = bar.gameObject.AddComponent<UIPanel>();
             _bar.riseDistance = 8f;
 
-            float left = UITheme.Pad * 0.5f;
+            float top = UITheme.Pad;
 
             for (int i = 0; i < names.Length; i++)
             {
-                UIButton tab = Chip(bar, names[i].Value, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
-                                    new Vector2(left + i * (tabWidth + gap), 0f),
-                                    new Vector2(tabWidth, UILayout.TabBarHeight - 12f));
-
                 Page page = names[i].Key;
-                tab.Clicked += () => Open(page);
 
+                Image mark;
+                UIButton tab = NavEntry(bar, names[i].Value,
+                                        top + i * (UILayout.NavItemHeight + UILayout.NavGap),
+                                        out mark);
+
+                tab.Clicked += () => Open(page);
                 _tabs[page] = tab;
+                _marks[page] = mark;
             }
+        }
+
+        /// <summary>
+        /// One entry on the rail: a full-width row with the word on the left
+        /// and a marker down the leading edge, which is the part that says
+        /// which one you are looking at without needing a second colour.
+        /// </summary>
+        UIButton NavEntry(Transform parent, string text, float top, out Image mark)
+        {
+            RectTransform rect = UIBuilder.Place(
+                UIBuilder.Node(parent, text),
+                new Vector2(0f, 1f), new Vector2(0f, 1f),
+                new Vector2(UITheme.Pad * 0.5f, -top),
+                new Vector2(UILayout.NavWidth - UITheme.Pad, UILayout.NavItemHeight));
+
+            var fill = rect.gameObject.AddComponent<Image>();
+            fill.sprite = UISprites.Fill(UITheme.RadiusSmall);
+            fill.type = Image.Type.Sliced;
+            fill.color = UITheme.Card;
+
+            RectTransform mark = UIBuilder.Place(
+                UIBuilder.Node(rect, "Mark"),
+                new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
+                new Vector2(6f, 0f), new Vector2(3f, UILayout.NavItemHeight - 16f));
+
+            var marker = mark.gameObject.AddComponent<Image>();
+            marker.sprite = UISprites.Fill(2);
+            marker.type = Image.Type.Sliced;
+            marker.color = UITheme.Ice;
+            marker.raycastTarget = false;
+
+            Text label = UIBuilder.Label(rect, "Label", UITheme.Micro, UITheme.Ink,
+                                         TextAnchor.MiddleLeft, FontStyle.Bold);
+            UIBuilder.Place(label.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
+                            new Vector2(20f, 0f),
+                            new Vector2(UILayout.NavWidth - UITheme.Pad - 28f,
+                                        UILayout.NavItemHeight));
+            label.text = UITheme.Track(text);
+
+            var button = rect.gameObject.AddComponent<UIButton>();
+            button.background = fill;
+            button.label = label;
+            button.SetRestColour(UITheme.Card);
+
+            mark = marker;
+            return button;
         }
 
         /// <summary>
@@ -567,6 +622,17 @@ namespace SnowBound.Hud
 
                 pair.Value.SetRestColour(rest);
                 pair.Value.labelColour = pair.Key == suggested ? UITheme.Ice : UITheme.Ink;
+
+                // The marker belongs to the page that is open, and to the one
+                // being suggested only faintly, so the rail has one obvious
+                // answer on it rather than two competing ones.
+                Image mark;
+                if (_marks.TryGetValue(pair.Key, out mark) && mark != null)
+                {
+                    Color tint = UITheme.Ice;
+                    tint.a = pair.Key == _page ? 1f : pair.Key == suggested ? 0.45f : 0f;
+                    mark.color = tint;
+                }
             }
 
             if (!PageOpen) { _status.text = string.Empty; return; }
