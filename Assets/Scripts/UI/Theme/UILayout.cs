@@ -40,21 +40,19 @@ namespace SnowBound.Hud
         /// <summary>Everything below the top bar starts here.</summary>
         public const float UnderTopBar = Margin * 2f + TopBarHeight;
 
-        /// <summary>
-        /// The row of tabs along the bottom. This is always on screen in
-        /// management mode: it is the only way into the tools, so hiding it
-        /// until a tool is open would leave nothing to click.
-        /// </summary>
-        public const float TabBarHeight = 48f;
-
-        /// <summary>Gap between the tab row and the panel it opens.</summary>
-        public const float TabGap = 8f;
-
-        /// <summary>The tool dock, which opens above the tabs.</summary>
+        /// <summary>The tool dock, which opens from the rail.</summary>
         public const float DockHeight = 310f;
 
-        /// <summary>Bottom of the dock panel, measured from the screen bottom.</summary>
-        public const float DockBottom = Margin + TabBarHeight + TabGap;
+        /// <summary>
+        /// Bottom of the dock panel, measured from the screen bottom.
+        ///
+        /// Just the margin. It used to add the height of the row of tabs and
+        /// the gap above them, because the dock opened above that row — but
+        /// the tabs are a rail down the left now, and the reservation stayed
+        /// behind as fifty-six pixels of nothing under the dock. Which is also
+        /// fifty-six pixels the rails get back.
+        /// </summary>
+        public const float DockBottom = Margin;
 
         /// <summary>Everything above the dock stops here.</summary>
         public const float AboveDock = DockBottom + DockHeight + Margin * 0.5f;
